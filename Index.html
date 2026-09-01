@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <title>Dates Analytics Log</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Vue 3 -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+
+  <!-- Apache ECharts -->
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+
+  <?!= include('Styles'); ?>
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+  <div id="app" class="min-h-screen flex flex-col items-center justify-center gap-3">
+    <h1 class="text-2xl font-semibold">{{ titulo }}</h1>
+    <p class="text-slate-500">Vue reactivo funcionando: contador = {{ contador }}</p>
+    <button
+      class="px-4 py-2 rounded-lg bg-slate-800 text-white hover:bg-slate-700 transition"
+      @click="contador++"
+    >
+      Sumar
+    </button>
+
+    <!--
+      A partir de Fase 3+ este shell se reemplaza por:
+      <ui-filters></ui-filters>
+      <ui-charts></ui-charts>
+      <ui-table></ui-table>
+      montados sobre el estado de Store.html.
+      Includes futuros:
+      <?!= include('Store'); ?>
+      <?!= include('UI_Filters'); ?>
+      <?!= include('UI_Charts'); ?>
+      <?!= include('UI_Table'); ?>
+    -->
+  </div>
+
+  <script>
+    const { createApp, ref } = Vue;
+
+    createApp({
+      setup() {
+        const titulo = ref('Dates Analytics Log — Fase 0');
+        const contador = ref(0);
+        return { titulo, contador };
+      }
+    }).mount('#app');
+  </script>
+
+</body>
+</html>
