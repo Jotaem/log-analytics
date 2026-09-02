@@ -18,40 +18,47 @@
 </head>
 <body class="bg-slate-50 text-slate-800">
 
-  <div id="app" class="min-h-screen flex flex-col items-center justify-center gap-3">
-    <h1 class="text-2xl font-semibold">{{ titulo }}</h1>
-    <p class="text-slate-500">Vue reactivo funcionando: contador = {{ contador }}</p>
-    <button
-      class="px-4 py-2 rounded-lg bg-slate-800 text-white hover:bg-slate-700 transition"
-      @click="contador++"
-    >
-      Sumar
-    </button>
+  <div id="app" class="min-h-screen p-8 flex flex-col items-center">
+    <h1 class="text-2xl font-semibold mb-6">{{ titulo }}</h1>
+    
+    <!-- Renderizado del componente Fase 3 -->
+    <ui-filters></ui-filters>
+    <!-- Renderizado del componente Fase 4 -->
+    <ui-charts></ui-charts>
+    <!-- Renderizado del componente Fase 5 -->
+    <ui-table></ui-table>
 
-    <!--
-      A partir de Fase 3+ este shell se reemplaza por:
-      <ui-filters></ui-filters>
-      <ui-charts></ui-charts>
-      <ui-table></ui-table>
-      montados sobre el estado de Store.html.
-      Includes futuros:
-      <?!= include('Store'); ?>
-      <?!= include('UI_Filters'); ?>
-      <?!= include('UI_Charts'); ?>
-      <?!= include('UI_Table'); ?>
-    -->
   </div>
+
+  <!-- 1. Cargar el motor matemático primero -->
+  <?!= include('Store'); ?>
+  
+  <!-- 2. Cargar los componentes visuales -->
+  <?!= include('UI_Filters'); ?>
+
+  <!-- 3. Cargar los componentes visuales -->
+  <?!= include('UI_Charts'); ?>
+
+  <!-- 4. Cargar los componentes visuales -->
+  <?!= include('UI_Table'); ?>
 
   <script>
     const { createApp, ref } = Vue;
 
-    createApp({
+    const app = createApp({
       setup() {
-        const titulo = ref('Dates Analytics Log — Fase 0');
-        const contador = ref(0);
-        return { titulo, contador };
+        const titulo = ref('Dates Analytics Log — Fase 3');
+        return { titulo };
       }
-    }).mount('#app');
+    });
+
+    // 3. Registrar el componente globalmente en Vue
+    app.component('ui-filters', UI_Filters);
+    app.component('ui-charts', UI_Charts);
+    app.component('ui-table', UI_Table);
+
+    // 4. Montar la app
+    app.mount('#app');
   </script>
 
 </body>

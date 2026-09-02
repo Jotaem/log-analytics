@@ -1,0 +1,207 @@
+<script>
+/**
+ * Componente Vue: UI_Filters
+ * Maneja el panel de configuración global, la instanciación de grupos 
+ * y la comunicación con el backend (google.script.run).
+ */
+const UI_Filters = {
+  template: `
+    <div class="w-full max-w-7xl mx-auto bg-white shadow-sm rounded-xl border border-slate-200 p-6 mb-6">
+      
+      <!-- HEADER & APLICAR -->
+      <div class="flex justify-between items-center mb-6 border-b border-slate-100 pb-4">
+        <h2 class="text-xl font-bold text-slate-800">Panel de Cohortes</h2>
+        <button 
+          @click="aplicarFiltros" 
+          :disabled="isApplying"
+          class="px-6 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition disabled:opacity-50 flex items-center gap-2">
+          <span v-if="isApplying" class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
+          {{ isApplying ? 'Calculando...' : 'Aplicar Filtros' }}
+        </button>
+      </div>
+
+      <!-- FILTROS GLOBALES -->
+      <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Ciudades (Log)</label>
+          <input v-model="globalFilters.cities" type="text" placeholder="Ej: Santiago, Antofagasta..." class="w-full text-sm border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" />
+          <p class="text-[10px] text-slate-400 mt-1">Separadas por coma</p>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Zonas (Log)</label>
+          <input v-model="globalFilters.zones" type="text" placeholder="Ej: Las Condes, Centro..." class="w-full text-sm border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" />
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Franquicia</label>
+          <input v-model="globalFilters.franchises" type="text" placeholder="Ej: McDonald's..." class="w-full text-sm border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" />
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Operación</label>
+          <select v-model="globalFilters.logisticMarketplace" class="w-full text-sm border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+            <option :value="null">Ambos (Sin filtro)</option>
+            <option value="Logistic">Logistic</option>
+            <option value="Marketplace">Marketplace</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Ubicación</label>
+          <select v-model="globalFilters.isMall" class="w-full text-sm border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+            <option :value="null">Todos (Sin filtro)</option>
+            <option :value="true">Solo Malls</option>
+            <option :value="false">No Malls (Calle)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- GESTIÓN DE GRUPOS -->
+      <div class="flex items-center gap-3 mb-4">
+        <h3 class="text-sm font-bold text-slate-700 uppercase">Grupos de Comparación ({{ storeState.groups.length }}/4)</h3>
+        <button v-if="storeState.groups.length < 4" @click="agregarGrupo" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1 rounded-full font-medium transition">
+          + Añadir Grupo
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div v-for="(group, index) in storeState.groups" :key="group.id" class="border border-slate-200 rounded-xl p-4 relative bg-slate-50">
+          <button v-if="storeState.groups.length > 1" @click="removerGrupo(group.id)" class="absolute top-3 right-3 text-slate-400 hover:text-red-500">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+          
+          <input v-model="group.label" type="text" class="font-bold text-slate-700 bg-transparent border-none p-0 focus:ring-0 mb-3 w-4/5" />
+          
+          <div class="mb-3">
+            <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">Modo Temporal</label>
+            <select v-model="group.ui.timeMode" class="w-full text-xs border-slate-300 rounded-md shadow-sm py-1">
+              <option value="dates">Rango de Fechas Exactas</option>
+              <option value="weeks">Semanas</option>
+              <option value="months">Meses</option>
+              <option value="dow">Días de la Semana</option>
+            </select>
+          </div>
+
+          <!-- Fechas Exactas -->
+          <div v-if="group.ui.timeMode === 'dates'" class="flex gap-2">
+            <div class="w-1/2">
+              <label class="block text-[10px] text-slate-500 mb-1">Desde</label>
+              <input v-model="group.rangoTemporal.fromDate" type="date" class="w-full text-xs border-slate-300 rounded p-1" />
+            </div>
+            <div class="w-1/2">
+              <label class="block text-[10px] text-slate-500 mb-1">Hasta</label>
+              <input v-model="group.rangoTemporal.toDate" type="date" class="w-full text-xs border-slate-300 rounded p-1" />
+            </div>
+          </div>
+
+          <!-- Otros modos (Placeholder UI para extensión lógica temporal) -->
+          <div v-else class="text-xs text-amber-600 bg-amber-50 p-2 rounded border border-amber-200">
+            * El modo <b>{{ group.ui.timeMode }}</b> requiere lógica auxiliar para mapear a fromDate/toDate. Se enviará el rango configurado por defecto temporalmente.
+          </div>
+
+          <!-- Loading State Local -->
+          <div v-if="group.loading" class="mt-4 p-3 bg-blue-50 rounded-lg flex items-center justify-center gap-2">
+            <span class="animate-spin h-3 w-3 border-2 border-blue-600 border-t-transparent rounded-full"></span>
+            <span class="text-xs text-blue-700 font-medium">Consultando BQ...</span>
+          </div>
+          
+          <div v-if="group.error" class="mt-4 p-2 bg-red-50 text-red-600 text-[10px] rounded border border-red-100">
+            {{ group.error }}
+          </div>
+        </div>
+      </div>
+    </div>
+  `,
+  setup() {
+    const { reactive, ref, onMounted } = Vue;
+    const storeState = Store.state;
+    const isApplying = ref(false);
+
+    // Estado local de los filtros de la barra superior
+    const globalFilters = reactive({
+      cities: '',
+      zones: '',
+      franchises: '',
+      logisticMarketplace: null,
+      isMall: null
+    });
+
+    // Inicializar un grupo por defecto
+    onMounted(() => {
+      if (storeState.groups.length === 0) {
+        agregarGrupo();
+      }
+    });
+
+    const agregarGrupo = () => {
+      Store.addGroup('Cohorte ' + (storeState.groups.length + 1), {}, { 
+        fromDate: '2026-01-01', 
+        toDate: '2026-01-31' 
+      });
+      // Añadimos propiedad UI específica para este componente
+      const nuevo = storeState.groups[storeState.groups.length - 1];
+      nuevo.ui = { timeMode: 'dates' };
+    };
+
+    const removerGrupo = (id) => Store.removeGroup(id);
+
+    // Helpers para parsear inputs crudos a arrays[cite: 3]
+    const parseList = (str) => str.split(',').map(s => s.trim()).filter(s => s.length > 0);
+
+    const aplicarFiltros = async () => {
+      isApplying.value = true;
+      
+      const payloadBase = {
+        cities: parseList(globalFilters.cities),
+        zones: parseList(globalFilters.zones),
+        franchises: parseList(globalFilters.franchises),
+        logisticMarketplace: globalFilters.logisticMarketplace,
+        isMall: globalFilters.isMall
+      };
+
+      // Disparar peticiones asíncronas para cada grupo
+      const promises = storeState.groups.map(group => {
+        return new Promise((resolve) => {
+          group.loading = true;
+          group.error = null;
+
+          // Combinar filtros globales con el rango temporal del grupo[cite: 3]
+          const reqPayload = {
+            ...payloadBase,
+            fromDate: group.rangoTemporal.fromDate,
+            toDate: group.rangoTemporal.toDate
+          };
+
+          google.script.run
+            .withSuccessHandler((responseString) => {
+              group.loading = false;
+              
+              // Descomprime el texto a un arreglo de objetos
+              const data = JSON.parse(responseString);
+              console.log(`Grupo ${group.id} recibió ${data.length} filas.`);
+              
+              Store.setGroupRawData(group.id, data);
+              resolve({ success: true, id: group.id });
+            })
+            .withFailureHandler((err) => {
+              group.loading = false;
+              group.error = err.message;
+              console.error('Error BQ Grupo', group.id, err);
+              resolve({ success: false, id: group.id });
+            })
+            .fetchDashboardData(reqPayload); // Llama a Controller.gs[cite: 3]
+        });
+      });
+
+      await Promise.all(promises);
+      isApplying.value = false;
+    };
+
+    return {
+      storeState,
+      globalFilters,
+      isApplying,
+      agregarGrupo,
+      removerGrupo,
+      aplicarFiltros
+    };
+  }
+};
+</script>

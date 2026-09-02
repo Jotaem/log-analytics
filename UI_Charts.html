@@ -1,0 +1,182 @@
+<script>
+const UI_Charts = {
+  template: `
+    <div v-if="hasData" class="w-full max-w-7xl mx-auto bg-white shadow-sm rounded-xl border border-slate-200 p-6 mb-6">
+      
+      <!-- Controles del Gráfico -->
+      <div class="flex flex-wrap justify-between items-center mb-6 border-b border-slate-100 pb-4 gap-4">
+        <h2 class="text-xl font-bold text-slate-800">Tendencias Temporales</h2>
+        
+        <div class="flex items-center gap-4">
+          <div>
+            <label class="text-xs font-semibold text-slate-500 uppercase mr-2">Métrica:</label>
+            <select v-model="config.metric" @change="renderCharts" class="text-sm border-slate-300 rounded-md shadow-sm">
+              <option value="total_orders">Órdenes Totales</option>
+              <option value="confirmed_orders">Órdenes Confirmadas</option>
+              <option value="rejected_orders">Órdenes Rechazadas</option>
+              <option value="fail_rate">Fail Rate %</option>
+              <option value="city_total_sessions">Sesiones de Ciudad</option>
+              <option value="city_cvr_neto">City CVR Neto</option>
+              <option value="city_cvr_2">City CVR 2</option>
+              <option value="city_cvr_3">City CVR 3</option>
+              <option value="open_time_pct">Cumplimiento Open Time %</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="text-xs font-semibold text-slate-500 uppercase mr-2">Tipo:</label>
+            <select v-model="config.type" @change="renderCharts" class="text-sm border-slate-300 rounded-md shadow-sm">
+              <option value="line">Línea</option>
+              <option value="bar">Barra</option>
+            </select>
+          </div>
+
+          <label class="flex items-center gap-2 cursor-pointer bg-slate-100 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition">
+            <input type="checkbox" v-model="config.merged" @change="renderCharts" class="rounded text-blue-600 focus:ring-blue-500" />
+            <span class="text-sm font-medium text-slate-700">Fusionar Grupos</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Lienzos de Gráficos -->
+      <div v-if="config.merged" id="chart-merged" class="w-full h-96"></div>
+      
+      <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div v-for="group in groupsWithData" :key="group.id" class="border border-slate-100 rounded-lg p-2 bg-slate-50">
+          <h3 class="text-center text-sm font-bold text-slate-600 mb-2">{{ group.label }}</h3>
+          <div :id="'chart-' + group.id" class="w-full h-72"></div>
+        </div>
+      </div>
+
+    </div>
+  `,
+  setup() {
+    const { computed, reactive, watch, nextTick, onUnmounted } = Vue;
+    const storeState = Store.state;
+    let chartInstances = [];
+
+    const config = reactive({
+      metric: 'total_orders',
+      type: 'line',
+      merged: false
+    });
+
+    // Computed para saber si hay datos listos para renderizar
+    const groupsWithData = computed(() => {
+      return storeState.groups.filter(g => g.aggregatedData && g.aggregatedData.timeSeries.length > 0);
+    });
+
+    const hasData = computed(() => groupsWithData.value.length > 0);
+
+    // Formateador dinámico para el eje Y y Tooltips
+    const formatValue = (val, metric) => {
+      if (['fail_rate', 'open_time_pct', 'city_cvr_neto', 'city_cvr_2', 'city_cvr_3'].includes(metric)) {
+        return (val * 100).toFixed(2) + '%';
+      }
+      return val.toLocaleString('es-CL');
+    };
+
+    const disposeCharts = () => {
+      chartInstances.forEach(instance => instance.dispose());
+      chartInstances = [];
+    };
+
+    const renderCharts = async () => {
+      if (!hasData.value) return;
+      
+      // Esperar a que el DOM se actualice (v-if / v-else)
+      await nextTick();
+      disposeCharts();
+
+      const metricLabel = document.querySelector('select[v-model="config.metric"] option:checked')?.text || config.metric;
+
+      if (config.merged) {
+        // --- MODO FUSIONADO ---
+        const dom = document.getElementById('chart-merged');
+        if (!dom) return;
+        
+        const chart = echarts.init(dom);
+        chartInstances.push(chart);
+
+        // Extraer fechas únicas de todos los grupos para un eje X unificado
+        const allDates = new Set();
+        groupsWithData.value.forEach(g => {
+          g.aggregatedData.timeSeries.forEach(d => allDates.add(d.fecha));
+        });
+        const xAxisData = Array.from(allDates).sort();
+
+        const series = groupsWithData.value.map(g => {
+          const dataMap = new Map(g.aggregatedData.timeSeries.map(d => [d.fecha, d[config.metric]]));
+          return {
+            name: g.label,
+            type: config.type,
+            smooth: true,
+            data: xAxisData.map(fecha => dataMap.get(fecha) || 0)
+          };
+        });
+
+        chart.setOption({
+          tooltip: {
+            trigger: 'axis',
+            valueFormatter: (value) => formatValue(value, config.metric)
+          },
+          legend: { top: 'bottom' },
+          grid: { left: '3%', right: '4%', bottom: '10%', containLabel: true },
+          xAxis: { type: 'category', data: xAxisData },
+          yAxis: { type: 'value' },
+          series: series
+        });
+
+      } else {
+        // --- MODO SEPARADO (SINCRONIZADO) ---
+        groupsWithData.value.forEach(g => {
+          const dom = document.getElementById('chart-' + g.id);
+          if (!dom) return;
+
+          const chart = echarts.init(dom);
+          chartInstances.push(chart);
+
+          const xAxisData = g.aggregatedData.timeSeries.map(d => d.fecha);
+          const seriesData = g.aggregatedData.timeSeries.map(d => d[config.metric]);
+
+          chart.setOption({
+            tooltip: {
+              trigger: 'axis',
+              valueFormatter: (value) => formatValue(value, config.metric)
+            },
+            grid: { left: '5%', right: '5%', bottom: '10%', top: '5%', containLabel: true },
+            xAxis: { type: 'category', data: xAxisData },
+            yAxis: { type: 'value' },
+            series: [{
+              name: metricLabel,
+              type: config.type,
+              smooth: true,
+              data: seriesData,
+              areaStyle: config.type === 'line' ? { opacity: 0.1 } : null,
+              itemStyle: { color: '#2563eb' }
+            }]
+          });
+        });
+
+        // Sincronizar tooltips entre los gráficos separados
+        echarts.connect(chartInstances);
+      }
+    };
+
+    // Escuchar si llegan datos nuevos al store
+    watch(() => storeState.groups, () => {
+      renderCharts();
+    }, { deep: true });
+
+    // Limpiar memoria al desmontar
+    onUnmounted(() => disposeCharts());
+
+    return {
+      config,
+      hasData,
+      groupsWithData,
+      renderCharts
+    };
+  }
+};
+</script>

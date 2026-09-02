@@ -1,21 +1,27 @@
 /**
  * Config.gs
- * Configuración central del proyecto. Nada de valores de negocio hardcodeados aquí abajo:
- * fechas, ciudades, zonas, etc. siempre llegan como parámetros desde el frontend.
+ * Configuración central del proyecto. Nada de valores de negocio hardcodeados:
+ * fechas, ciudades, zonas, etc. siempre llegan como parámetros desde el frontend
+ * y viajan como Query Parameters de BigQuery (nunca concatenados en el SQL).
  */
 
 const BQ_CONFIG = {
-  PROJECT_ID: 'peya-bi-tools-pro',
-  // TODO Fase 1: confirmar dataset/tabla exactos de la Query Maestra
-  DATASET: '',
-  TABLE: '',
-  LOCATION: 'US' // ajustar según la región real del dataset en BigQuery
+  PROJECT_ID: 'peya-chile',
+  LOCATION: 'US', // TODO: confirmar región real de los datasets si las queries fallan por location mismatch
+
+  // Tablas reales que usa la Query Maestra (ver Service_BigQuery.gs)
+  TABLES: {
+    SESSIONS: 'peya-bi-tools-pro.il_sessions.fact_perseus_sessions',
+    LOGISTIC_ORDERS: 'peya-bi-tools-pro.il_logistics.fact_logistic_orders',
+    ORDERS: 'peya-bi-tools-pro.il_core.fact_orders',
+    PARTNER: 'peya-bi-tools-pro.il_core.dim_partner',
+    AREA: 'peya-bi-tools-pro.il_core.dim_area',
+    HISTORICAL_PARTNERS: 'peya-bi-tools-pro.il_core.dim_historical_partners'
+  },
+
+  COUNTRY_ID: 2 // Chile
 };
 
-// Rango de fechas por defecto SOLO para pruebas locales en Fase 0.
-// En Fase 1 esto deja de usarse: el rango real llega en el objeto `filters`
-// desde UI_Filters.html -> Controller.fetchDashboardData(filters).
-const DEFAULT_TEST_RANGE = {
-  from: '2026-01-01',
-  to: '2026-01-31'
-};
+// Límite de seguridad: rango máximo de días por grupo para no escanear
+// datasets completos sin querer. Ajustar según performance real observada.
+const MAX_DATE_RANGE_DAYS = 186; // ~6 meses

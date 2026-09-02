@@ -1,0 +1,288 @@
+<script>
+/**
+ * Store.html — El "Cerebro" del Frontend (Fase 2 del roadmap).
+ *
+ * Única fuente de verdad para: estado reactivo de los grupos de comparación
+ * y las funciones matemáticas que agregan el dataset crudo de BigQuery.
+ *
+ * REGLA DE ORO (ver DATA_SHEET.md / KEY_NOTES.md):
+ * - Ratios y CVRs: SIEMPRE sum(numerador)/sum(denominador). Nunca promediar
+ *   columnas *_pct ni *_rate directamente.
+ * - city_total_sessions_raw viene repetido por cada partner de la ciudad:
+ *   SIEMPRE desduplicar por ciudad+fecha antes de sumar sesiones.
+ *
+ * Ninguna vista (UI_Charts, UI_Table) debe calcular métricas por su cuenta:
+ * todas pasan por las funciones de este archivo.
+ */
+const Store = (function () {
+  const { reactive } = Vue;
+
+  // ---------------------------------------------------------------------
+  // ESTADO REACTIVO
+  // ---------------------------------------------------------------------
+  // Cada grupo: { id, filtrosLocales, rangoTemporal, rawData, aggregatedData }
+  // rawData: array de objetos tal como llega de Controller.fetchDashboardData
+  // aggregatedData: { timeSeries, partnerTotals, dedupedTotalSessions } — ver aggregateGroup()
+  const state = reactive({
+    groups: []
+  });
+
+  // ---------------------------------------------------------------------
+  // MOTOR MATEMÁTICO — funciones puras, sin dependencia del estado
+  // ---------------------------------------------------------------------
+
+  /**
+   * Desduplica sesiones de ciudad por la llave ciudad+fecha.
+   * `rawData` trae `city_total_sessions_raw` repetido en cada fila de partner
+   * de esa ciudad ese día — sumarlo directo multiplicaría las sesiones reales.
+   *
+   * @return Map con key "ciudad|fecha" -> { ciudad, fecha, total_sessions,
+   *   sessions_shop_list, sessions_shop_details, sessions_checkout, sessions_with_orders }
+   */
+  function dedupeCitySessions(rows) {
+    const map = new Map();
+    rows.forEach(function (row) {
+      const key = row.ciudad + '|' + row.fecha;
+      if (!map.has(key)) {
+        map.set(key, {
+          ciudad: row.ciudad,
+          fecha: row.fecha,
+          total_sessions: row.city_total_sessions_raw || 0,
+          sessions_shop_list: row.city_sessions_shop_list || 0,
+          sessions_shop_details: row.city_sessions_shop_details || 0,
+          sessions_checkout: row.city_sessions_checkout || 0,
+          sessions_with_orders: row.city_sessions_with_orders || 0
+        });
+      }
+      // Si la misma ciudad+fecha ya está registrada, se ignora (es la
+      // fila duplicada de otro partner) — por diseño no se suma de nuevo.
+    });
+    return map;
+  }
+
+  /**
+   * Ratio genérico: SUM(numerador) / SUM(denominador) sobre un array de filas.
+   * Nunca promedia columnas de porcentaje ya calculadas.
+   * @return number | null (null si el denominador total es 0, para no dividir por cero)
+   */
+  function calcRatio(rows, numKey, denKey) {
+    let num = 0, den = 0;
+    rows.forEach(function (r) {
+      num += (r[numKey] || 0);
+      den += (r[denKey] || 0);
+    });
+    return den > 0 ? num / den : null;
+  }
+
+  /** Share de un partner sobre el total de órdenes del grupo renderizado. */
+  function calcShareOverGroup(partnerOrders, groupTotalOrders) {
+    return groupTotalOrders > 0 ? partnerOrders / groupTotalOrders : null;
+  }
+
+  /** Penetración: órdenes del partner / sesiones de ciudad YA desduplicadas. */
+  function calcPenetracion(partnerOrders, dedupedCitySessionsTotal) {
+    return dedupedCitySessionsTotal > 0 ? partnerOrders / dedupedCitySessionsTotal : null;
+  }
+
+  function sumBy_(rows, key) {
+    return rows.reduce(function (acc, r) { return acc + (r[key] || 0); }, 0);
+  }
+
+  // ---------------------------------------------------------------------
+  // AGREGACIÓN DE UN GRUPO COMPLETO
+  // ---------------------------------------------------------------------
+
+  /**
+   * A partir del rawData de un grupo, produce:
+   * - timeSeries: una fila agregada por fecha (para UI_Charts)
+   * - partnerTotals: una fila agregada por vendor_code para todo el período (para UI_Table)
+   * - dedupedTotalSessions: sesiones de ciudad ya desduplicadas, sumadas para todo el período
+   */
+  function aggregateGroup(rawData) {
+    if (!rawData || rawData.length === 0) {
+      return { timeSeries: [], partnerTotals: [], dedupedTotalSessions: 0 };
+    }
+
+    const cityDedup = dedupeCitySessions(rawData);
+    const dedupedTotalSessions = sumBy_(Array.from(cityDedup.values()), 'total_sessions');
+
+    // ---- Time series (por fecha) ----
+    const byDate = new Map();
+    rawData.forEach(function (row) {
+      if (!byDate.has(row.fecha)) byDate.set(row.fecha, []);
+      byDate.get(row.fecha).push(row);
+    });
+
+    const timeSeries = Array.from(byDate.keys()).sort().map(function (fecha) {
+      const rowsOfDate = byDate.get(fecha);
+
+      // Sesiones del día: sumar solo las entradas deduplicadas cuya fecha sea esta.
+      const sessionsOfDate = Array.from(cityDedup.values())
+        .filter(function (c) { return c.fecha === fecha; });
+      const totalSessionsDate = sumBy_(sessionsOfDate, 'total_sessions');
+      const sessionsWithOrdersDate = sumBy_(sessionsOfDate, 'sessions_with_orders');
+      const sessionsShopListDate = sumBy_(sessionsOfDate, 'sessions_shop_list');
+      const sessionsShopDetailsDate = sumBy_(sessionsOfDate, 'sessions_shop_details');
+      const sessionsCheckoutDate = sumBy_(sessionsOfDate, 'sessions_checkout');
+
+      return {
+        fecha: fecha,
+        total_orders: sumBy_(rowsOfDate, 'total_orders'),
+        confirmed_orders: sumBy_(rowsOfDate, 'confirmed_orders'),
+        rejected_orders: sumBy_(rowsOfDate, 'rejected_orders'),
+        fail_rate: calcRatio(rowsOfDate, 'rejected_orders', 'total_orders'),
+        open_time_pct: calcRatio(rowsOfDate, 'real_open_time_minutes', 'plan_open_time_minutes'),
+        city_total_sessions: totalSessionsDate,
+        city_cvr_neto: totalSessionsDate > 0 ? sessionsWithOrdersDate / totalSessionsDate : null,
+        city_cvr_2: sessionsShopListDate > 0 ? sessionsShopDetailsDate / sessionsShopListDate : null,
+        city_cvr_3: sessionsCheckoutDate > 0 ? sessionsWithOrdersDate / sessionsCheckoutDate : null
+      };
+    });
+
+    // ---- Totales por partner (para el ranking) ----
+    const byPartner = new Map();
+    rawData.forEach(function (row) {
+      if (!byPartner.has(row.vendor_code)) byPartner.set(row.vendor_code, []);
+      byPartner.get(row.vendor_code).push(row);
+    });
+
+    const groupTotalOrders = sumBy_(rawData, 'total_orders');
+
+    const partnerTotals = Array.from(byPartner.entries()).map(function (entry) {
+      const vendorCode = entry[0];
+      const rows = entry[1];
+      const first = rows[0]; // atributos estáticos del partner (nombre, mall, etc.)
+      const totalOrders = sumBy_(rows, 'total_orders');
+      const rejectedOrders = sumBy_(rows, 'rejected_orders');
+
+      return {
+        vendor_code: vendorCode,
+        partner_name: first.partner_name,
+        franchise_name: first.franchise_name,
+        is_mall: first.is_mall,
+        is_logistic_marketplace: first.is_logistic_marketplace,
+        total_orders: totalOrders,
+        rejected_orders: rejectedOrders,
+        fail_rate: calcRatio(rows, 'rejected_orders', 'total_orders'),
+        open_time_pct: calcRatio(rows, 'real_open_time_minutes', 'plan_open_time_minutes'),
+        share_over_group: calcShareOverGroup(totalOrders, groupTotalOrders),
+        penetracion: calcPenetracion(totalOrders, dedupedTotalSessions)
+      };
+    });
+
+    return { timeSeries: timeSeries, partnerTotals: partnerTotals, dedupedTotalSessions: dedupedTotalSessions };
+  }
+
+  // ---------------------------------------------------------------------
+  // GESTIÓN DE GRUPOS (2 a 4)
+  // ---------------------------------------------------------------------
+
+  function addGroup(label, filtrosLocales, rangoTemporal) {
+    if (state.groups.length >= 4) {
+      throw new Error('Máximo 4 grupos de comparación.');
+    }
+    const group = {
+      id: 'g_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+      label: label || ('Grupo ' + (state.groups.length + 1)),
+      filtrosLocales: filtrosLocales || {},
+      rangoTemporal: rangoTemporal || {},
+      rawData: [],
+      aggregatedData: { timeSeries: [], partnerTotals: [], dedupedTotalSessions: 0 },
+      loading: false,
+      error: null
+    };
+    state.groups.push(group);
+    return group.id;
+  }
+
+  function removeGroup(groupId) {
+    const idx = state.groups.findIndex(function (g) { return g.id === groupId; });
+    if (idx !== -1) state.groups.splice(idx, 1);
+  }
+
+  function getGroup(groupId) {
+    return state.groups.find(function (g) { return g.id === groupId; }) || null;
+  }
+
+  /**
+   * Se llama una sola vez, justo después de que google.script.run trae el
+   * rawData del backend para ese grupo. Dispara la agregación completa.
+   * A partir de acá, cualquier cambio de eje/tipo de gráfico/granularidad
+   * en la UI relee aggregatedData sin volver a llamar al servidor.
+   */
+  function setGroupRawData(groupId, rawData) {
+    const group = getGroup(groupId);
+    if (!group) throw new Error('Grupo no encontrado: ' + groupId);
+    group.rawData = rawData;
+    group.aggregatedData = aggregateGroup(rawData);
+  }
+
+  // ---------------------------------------------------------------------
+  // SUITE DE VALIDACIÓN MANUAL (Fase 2 del roadmap)
+  // Corre con datos mock que replican el caso "3 partners, 1 ciudad, 2 fechas"
+  // documentado en BITACORA_REFACTOR.md. Ejecutar en consola: Store.runValidationTests()
+  // ---------------------------------------------------------------------
+  function runValidationTests() {
+    const mockRows = [
+      // Día 1 — Santiago, sesiones de ciudad = 1000 (repetidas por cada partner, a propósito)
+      { vendor_code: 'A', partner_name: 'Partner A', franchise_name: null, is_mall: false, is_logistic_marketplace: 'Logistic', ciudad: 'Santiago', fecha: '2026-01-01', total_orders: 10, confirmed_orders: 9, rejected_orders: 2, real_open_time_minutes: 500, plan_open_time_minutes: 600, city_total_sessions_raw: 1000, city_sessions_shop_list: 800, city_sessions_shop_details: 600, city_sessions_checkout: 400, city_sessions_with_orders: 300 },
+      { vendor_code: 'B', partner_name: 'Partner B', franchise_name: null, is_mall: true, is_logistic_marketplace: 'Marketplace', ciudad: 'Santiago', fecha: '2026-01-01', total_orders: 5, confirmed_orders: 5, rejected_orders: 0, real_open_time_minutes: 550, plan_open_time_minutes: 600, city_total_sessions_raw: 1000, city_sessions_shop_list: 800, city_sessions_shop_details: 600, city_sessions_checkout: 400, city_sessions_with_orders: 300 },
+      { vendor_code: 'C', partner_name: 'Partner C', franchise_name: 'Franquicia X', is_mall: false, is_logistic_marketplace: 'Logistic', ciudad: 'Santiago', fecha: '2026-01-01', total_orders: 20, confirmed_orders: 15, rejected_orders: 5, real_open_time_minutes: 400, plan_open_time_minutes: 600, city_total_sessions_raw: 1000, city_sessions_shop_list: 800, city_sessions_shop_details: 600, city_sessions_checkout: 400, city_sessions_with_orders: 300 },
+      // Día 2 — Santiago, sesiones de ciudad = 1200
+      { vendor_code: 'A', partner_name: 'Partner A', franchise_name: null, is_mall: false, is_logistic_marketplace: 'Logistic', ciudad: 'Santiago', fecha: '2026-01-02', total_orders: 8, confirmed_orders: 7, rejected_orders: 1, real_open_time_minutes: 590, plan_open_time_minutes: 600, city_total_sessions_raw: 1200, city_sessions_shop_list: 900, city_sessions_shop_details: 700, city_sessions_checkout: 500, city_sessions_with_orders: 350 },
+      { vendor_code: 'B', partner_name: 'Partner B', franchise_name: null, is_mall: true, is_logistic_marketplace: 'Marketplace', ciudad: 'Santiago', fecha: '2026-01-02', total_orders: 6, confirmed_orders: 3, rejected_orders: 3, real_open_time_minutes: 300, plan_open_time_minutes: 600, city_total_sessions_raw: 1200, city_sessions_shop_list: 900, city_sessions_shop_details: 700, city_sessions_checkout: 500, city_sessions_with_orders: 350 },
+      { vendor_code: 'C', partner_name: 'Partner C', franchise_name: 'Franquicia X', is_mall: false, is_logistic_marketplace: 'Logistic', ciudad: 'Santiago', fecha: '2026-01-02', total_orders: 15, confirmed_orders: 10, rejected_orders: 5, real_open_time_minutes: 580, plan_open_time_minutes: 600, city_total_sessions_raw: 1200, city_sessions_shop_list: 900, city_sessions_shop_details: 700, city_sessions_checkout: 500, city_sessions_with_orders: 350 }
+    ];
+
+    const expected = {
+      dedupedTotalSessions: 1000 + 1200, // NO 6600 (que sería el bug de sumar sin desduplicar)
+      groupTotalOrders: 10 + 5 + 20 + 8 + 6 + 15, // 64
+      groupFailRate: (2 + 0 + 5 + 1 + 3 + 5) / (10 + 5 + 20 + 8 + 6 + 15), // 16/64 = 0.25
+      partnerA_totalOrders: 10 + 8, // 18
+      partnerA_share: (10 + 8) / 64,
+      partnerA_penetracion: (10 + 8) / (1000 + 1200)
+    };
+
+    const agg = aggregateGroup(mockRows);
+    const partnerA = agg.partnerTotals.find(function (p) { return p.vendor_code === 'A'; });
+    const groupFailRate = calcRatio(mockRows, 'rejected_orders', 'total_orders');
+
+    const results = [
+      _check_('dedupedTotalSessions', agg.dedupedTotalSessions, expected.dedupedTotalSessions),
+      _check_('groupFailRate', groupFailRate, expected.groupFailRate),
+      _check_('partnerA.total_orders', partnerA.total_orders, expected.partnerA_totalOrders),
+      _check_('partnerA.share_over_group', partnerA.share_over_group, expected.partnerA_share),
+      _check_('partnerA.penetracion', partnerA.penetracion, expected.partnerA_penetracion)
+    ];
+
+    const allPass = results.every(function (r) { return r.pass; });
+    console.log(allPass ? '✅ Store.runValidationTests(): TODOS los casos pasaron' : '❌ Store.runValidationTests(): hay casos fallando');
+    console.table(results);
+    return allPass;
+  }
+
+  function _check_(label, actual, expected, tolerance) {
+    tolerance = tolerance || 1e-9;
+    const pass = Math.abs(actual - expected) < tolerance;
+    return { caso: label, esperado: expected, obtenido: actual, resultado: pass ? 'PASS' : 'FAIL' };
+  }
+
+  // ---------------------------------------------------------------------
+  return {
+    state: state,
+    // motor matemático (expuesto para tests / uso puntual desde la UI si hace falta)
+    dedupeCitySessions: dedupeCitySessions,
+    calcRatio: calcRatio,
+    calcShareOverGroup: calcShareOverGroup,
+    calcPenetracion: calcPenetracion,
+    aggregateGroup: aggregateGroup,
+    // gestión de grupos
+    addGroup: addGroup,
+    removeGroup: removeGroup,
+    getGroup: getGroup,
+    setGroupRawData: setGroupRawData,
+    // validación
+    runValidationTests: runValidationTests
+  };
+})();
+</script>

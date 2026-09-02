@@ -1,0 +1,159 @@
+<script>
+/**
+ * Componente Vue: UI_Table
+ * Tabla de ranking a nivel de partner con virtual/sticky scrolling,
+ * pestañas por grupo y ordenamiento dinámico.
+ */
+const UI_Table = {
+  template: `
+    <div v-if="groupsWithData.length > 0" class="w-full max-w-7xl mx-auto bg-white shadow-sm rounded-xl border border-slate-200 overflow-hidden mb-12">
+      
+      <!-- HEADER & TABS -->
+      <div class="px-6 pt-6 border-b border-slate-200">
+        <h2 class="text-xl font-bold text-slate-800 mb-4">Ranking de Partners</h2>
+        <div class="flex gap-4 overflow-x-auto">
+          <button 
+            v-for="group in groupsWithData" 
+            :key="group.id"
+            @click="activeGroupId = group.id"
+            :class="[
+              'pb-3 px-1 text-sm font-medium border-b-2 whitespace-nowrap transition-colors',
+              activeGroupId === group.id 
+                ? 'border-blue-600 text-blue-600' 
+                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+            ]"
+          >
+            {{ group.label }}
+          </button>
+        </div>
+      </div>
+
+      <!-- TABLA -->
+      <div class="overflow-x-auto max-h-[600px]">
+        <table class="min-w-full text-left text-sm text-slate-600">
+          <thead class="bg-slate-50 text-xs uppercase font-semibold text-slate-500 sticky top-0 shadow-sm z-10">
+            <tr>
+              <th v-for="col in columns" :key="col.key" @click="sortBy(col.key)" class="px-4 py-3 cursor-pointer hover:bg-slate-100 select-none whitespace-nowrap">
+                <div class="flex items-center gap-1">
+                  {{ col.label }}
+                  <span v-if="sortKey === col.key" class="text-blue-600">
+                    {{ sortAsc ? '↑' : '↓' }}
+                  </span>
+                </div>
+              </th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            <tr v-for="partner in sortedPartners" :key="partner.vendor_code" class="hover:bg-blue-50/50 transition-colors">
+              <td class="px-4 py-2 font-medium text-slate-800">{{ partner.vendor_code }}</td>
+              <td class="px-4 py-2 font-medium text-slate-800 truncate max-w-[200px]" :title="partner.partner_name">{{ partner.partner_name }}</td>
+              <td class="px-4 py-2 truncate max-w-[150px]">{{ partner.franchise_name }}</td>
+              <td class="px-4 py-2">
+                <span :class="['px-2 py-1 text-[10px] rounded-full font-medium', partner.is_logistic_marketplace === 'Logistic' ? 'bg-purple-100 text-purple-700' : 'bg-orange-100 text-orange-700']">
+                  {{ partner.is_logistic_marketplace }}
+                </span>
+              </td>
+              <td class="px-4 py-2 text-center">
+                <span v-if="partner.is_mall" class="text-emerald-600 font-bold" title="Mall">✓</span>
+                <span v-else class="text-slate-300">-</span>
+              </td>
+              <td class="px-4 py-2 text-right">{{ formatNum(partner.total_orders) }}</td>
+              <td class="px-4 py-2 text-right text-red-600">{{ formatNum(partner.rejected_orders) }}</td>
+              <td class="px-4 py-2 text-right font-medium">{{ formatPct(partner.fail_rate) }}</td>
+              <td class="px-4 py-2 text-right">{{ formatPct(partner.open_time_pct) }}</td>
+              <td class="px-4 py-2 text-right text-blue-600 font-medium">{{ formatPct(partner.share_over_group) }}</td>
+              <td class="px-4 py-2 text-right text-emerald-600 font-medium">{{ formatPct(partner.penetracion) }}</td>
+            </tr>
+            <tr v-if="sortedPartners.length === 0">
+              <td colspan="11" class="px-4 py-8 text-center text-slate-400">No hay datos para mostrar en este grupo.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  `,
+  setup() {
+    const { computed, ref, watch } = Vue;
+    const storeState = Store.state;
+
+    const activeGroupId = ref(null);
+    const sortKey = ref('total_orders');
+    const sortAsc = ref(false); // Por defecto descendente (los mejores primero)
+
+    const columns = [
+      { key: 'vendor_code', label: 'ID' },
+      { key: 'partner_name', label: 'Nombre' },
+      { key: 'franchise_name', label: 'Franquicia' },
+      { key: 'is_logistic_marketplace', label: 'Operación' },
+      { key: 'is_mall', label: 'Mall' },
+      { key: 'total_orders', label: 'Órdenes' },
+      { key: 'rejected_orders', label: 'Rechazos' },
+      { key: 'fail_rate', label: 'Fail Rate' },
+      { key: 'open_time_pct', label: 'Open Time' },
+      { key: 'share_over_group', label: 'Share (Grupo)' },
+      { key: 'penetracion', label: 'Penetración (Ciudad)' }
+    ];
+
+    const groupsWithData = computed(() => {
+      return storeState.groups.filter(g => g.aggregatedData && g.aggregatedData.partnerTotals.length > 0);
+    });
+
+    // Auto-seleccionar la primera pestaña si no hay ninguna activa o si se borra el grupo activo
+    watch(groupsWithData, (newGroups) => {
+      if (newGroups.length > 0 && (!activeGroupId.value || !newGroups.find(g => g.id === activeGroupId.value))) {
+        activeGroupId.value = newGroups[0].id;
+      }
+    }, { immediate: true, deep: true });
+
+    const activeGroupData = computed(() => {
+      const group = groupsWithData.value.find(g => g.id === activeGroupId.value);
+      return group ? group.aggregatedData.partnerTotals : [];
+    });
+
+    const sortedPartners = computed(() => {
+      let data = [...activeGroupData.value];
+      if (!sortKey.value) return data;
+
+      data.sort((a, b) => {
+        let valA = a[sortKey.value];
+        let valB = b[sortKey.value];
+
+        // Manejar nulos para que siempre queden al final
+        if (valA === null || valA === undefined) valA = sortAsc.value ? Infinity : -Infinity;
+        if (valB === null || valB === undefined) valB = sortAsc.value ? Infinity : -Infinity;
+
+        if (valA < valB) return sortAsc.value ? -1 : 1;
+        if (valA > valB) return sortAsc.value ? 1 : -1;
+        return 0;
+      });
+
+      return data;
+    });
+
+    const sortBy = (key) => {
+      if (sortKey.value === key) {
+        sortAsc.value = !sortAsc.value;
+      } else {
+        sortKey.value = key;
+        sortAsc.value = false; // Al cambiar de columna, ordenar descendente por defecto
+      }
+    };
+
+    const formatNum = (val) => val === null || val === undefined ? '-' : val.toLocaleString('es-CL');
+    const formatPct = (val) => val === null || val === undefined ? '-' : (val * 100).toFixed(2) + '%';
+
+    return {
+      groupsWithData,
+      activeGroupId,
+      columns,
+      sortedPartners,
+      sortKey,
+      sortAsc,
+      sortBy,
+      formatNum,
+      formatPct
+    };
+  }
+};
+</script>
