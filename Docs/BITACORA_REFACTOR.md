@@ -33,29 +33,28 @@ Copia esta plantilla al inicio del archivo (justo debajo de este bloque de instr
 
 ## Entradas
 
-# 1. Instalar clasp (si no lo tienes)
-npm install -g @google/clasp
+## [Fecha: 2026-09-02] — Desarrollo Core, Integración UI y Estabilización de BigQuery
 
-# 2. Login con tu cuenta Google (abre el navegador)
-clasp login
+- **Hora de inicio – Hora de cierre:** 14:00 – 16:30
+- **Duración total:** 5.5 horas
+- **Fase / Subfase relacionada:** Fases 3 a 7 — Implementación Frontend (Vue/ECharts), Conexión BQ, y Estabilización.
+- **Objetivo de la sesión:** Integrar la interfaz gráfica con el backend de BigQuery, resolver errores de permisos y diagnosticar fallos silenciosos en la entrega masiva de datos para lograr una versión de producción estable.
 
-# 3. Clonar el proyecto GAS existente a una carpeta local
-#    (el Script ID está en tu proyecto: Configuración del proyecto ⚙️ > ID del script)
-mkdir log-analytics && cd log-analytics
-clasp clone "190U-Bx8idFREr4_m85reklM_8I3xJ_Srq7WISYxmnIQW98cVuTgKsYfL" --rootDir ./src
+### Archivos creados/modificados
+- `Config.gs` — Modificado para corregir el `PROJECT_ID` de ejecución apuntando a `peya-data-origins-pro`, resolviendo el error 403 (Access Denied).
+- `Service_BigQuery.gs` — Refactorizado profundamente. Se reemplazó el paso de parámetros nulos por **SQL dinámico**. La cláusula `WHERE` ahora se ensambla condicionalmente para evitar el bug de la API de BigQuery donde `ARRAY_LENGTH(NULL)` elimina todas las filas de la tabla de forma silenciosa.
+- `Controller.gs` — Modificada la función `fetchDashboardData` para envolver la respuesta en `JSON.stringify(rawData)`. Esto actúa como un mecanismo de compresión para eludir el límite de ~15MB de `google.script.run`.
+- `UI_Filters.html` — Actualizada la promesa `withSuccessHandler` para incluir `JSON.parse()`, revirtiendo la compresión del backend exitosamente sin colapsar la memoria del navegador.
+- `Store.html`, `UI_Charts.html`, `UI_Table.html` — Creados e inyectados. Contienen el motor matemático anti "promedios de promedios" y la lógica reactiva que oculta los lienzos (`v-if="hasData"`) cuando no hay registros.
 
-# 4. Inicializar git y conectarlo a tu repo remoto
-git init
-echo "node_modules/
-.clasp.json" > .gitignore
-git add .
-git commit -m "Fase 0: setup inicial - shell Vue/Tailwind/ECharts, doGet, Config"
-git branch -M main
-git remote add origin https://github.com/Jotaem/log-analytics.git
-git push -u origin main
+### Decisiones tomadas
+- **Construcción de SQL Dinámico:** Se decidió dejar de intentar inyectar parámetros `null` o `[]` en la API de BigQuery. Si el usuario no aplica un filtro, la línea correspondiente del `WHERE` simplemente no se añade al string de la consulta.
+- **Bypass de Límite de Memoria (GAS):** Se estableció el estándar de transportar grandes volúmenes de datos entre Apps Script y el navegador como texto plano (String) en lugar de arreglos de objetos, previniendo fallos asíncronos asfixiantes.
+- **Separación de Responsabilidades:** Se mantuvo firmemente la decisión de que el backend solo extraiga sumas crudas (`total_orders`, `rejected_orders`) y que todo cálculo de ratio o porcentaje (Fail Rate, Share) ocurra estrictamente en el Frontend (`Store.html`).
 
-# 5. Para subir cambios locales a GAS
-clasp push
+### Pendientes para la próxima sesión
+- **Deuda Técnica:** Migrar los ~90 polígonos de malls (WKT) que actualmente residen en un CTE hardcodeado hacia una tabla formal `dim_malls` en BigQuery.
+- Monitorear el tiempo de respuesta del dashboard en la primera semana de uso real por parte de los analistas operativos.
 
-# 6. Para bajar cambios hechos desde el editor web de GAS
-clasp pull
+### Criterio de éxito de la subfase
+- [x] Cumplido — El dashboard conecta sin errores de permisos, los filtros responden sin colapsar la memoria, y los componentes visuales (ECharts y Tabla de Ranking) renderizan exitosamente los datos históricos reales.
