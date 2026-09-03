@@ -6,46 +6,62 @@
  */
 const UI_Filters = {
   template: `
-    <div class="w-full max-w-7xl mx-auto bg-white shadow-sm rounded-xl border border-slate-200 p-6 mb-6">
+    <div class="w-full max-w-7xl mx-auto bg-peya-white shadow-sm rounded-xl border border-slate-200 p-6 mb-6">
       
       <!-- HEADER & APLICAR -->
-      <div class="flex justify-between items-center mb-6 border-b border-slate-100 pb-4">
-        <h2 class="text-xl font-bold text-slate-800">Panel de Cohortes</h2>
-        <button 
-          @click="aplicarFiltros" 
-          :disabled="isApplying"
-          class="px-6 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition disabled:opacity-50 flex items-center gap-2">
-          <span v-if="isApplying" class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
-          {{ isApplying ? 'Calculando...' : 'Aplicar Filtros' }}
-        </button>
+      <div class="flex flex-wrap justify-between items-center mb-6 border-b border-slate-100 pb-4 gap-4">
+        <h2 class="text-xl font-bold text-peya-navy-90 flex items-center gap-2">
+          <svg class="w-5 h-5 fill-current text-peya-navy-70" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M5.51914 2C4.54897 2 3.73764 2.68233 3.53402 3.59551H2.04588C1.74444 3.59551 1.50008 3.84107 1.50008 4.14399C1.50008 4.44691 1.74444 4.69247 2.04588 4.69247H3.58921C3.85891 5.50374 4.62088 6.08866 5.51914 6.08866C6.4174 6.08866 7.17937 5.50374 7.44907 4.69247H13.9542C14.2556 4.69247 14.5 4.44691 14.5 4.14399C14.5 3.84107 14.2556 3.59551 13.9542 3.59551H7.50426C7.30064 2.68233 6.48931 2 5.51914 2ZM4.5764 4.04433C4.5764 3.52111 4.99848 3.09696 5.51914 3.09696C6.0398 3.09696 6.46188 3.52111 6.46188 4.04433C6.46188 4.56755 6.0398 4.99171 5.51914 4.99171C4.99848 4.99171 4.5764 4.56755 4.5764 4.04433Z"/><path fill-rule="evenodd" clip-rule="evenodd" d="M10.4809 6.12184C9.55835 6.12184 8.77952 6.73883 8.53015 7.58445H2.0458C1.74436 7.58445 1.5 7.83002 1.5 8.13293C1.5 8.43585 1.74436 8.68141 2.0458 8.68141L8.51177 8.68141C8.73909 9.56103 9.53437 10.2105 10.4809 10.2105C11.4274 10.2105 12.2227 9.56103 12.45 8.68141H13.9541C14.2556 8.68141 14.4999 8.43585 14.4999 8.13293C14.4999 7.83002 14.2556 7.58445 13.9541 7.58445H12.4317C12.1823 6.73883 11.4035 6.12184 10.4809 6.12184ZM9.53817 8.16617C9.53817 7.64295 9.96025 7.2188 10.4809 7.2188C11.0016 7.2188 11.4237 7.64295 11.4237 8.16617C11.4237 8.68939 11.0016 9.11355 10.4809 9.11355C9.96025 9.11355 9.53817 8.68939 9.53817 8.16617Z"/><path fill-rule="evenodd" clip-rule="evenodd" d="M5.51914 9.91133C4.52557 9.91133 3.69854 10.627 3.52033 11.5734H2.04588C1.74444 11.5734 1.50008 11.819 1.50008 12.1219C1.50008 12.4248 1.74444 12.6704 2.04588 12.6704H3.61262C3.90098 13.4468 4.6456 14 5.51914 14C6.39268 14 7.1373 13.4468 7.42566 12.6704H13.9542C14.2556 12.6704 14.5 12.4248 14.5 12.1219C14.5 11.819 14.2556 11.5734 13.9542 11.5734H7.51795C7.33974 10.627 6.51271 9.91133 5.51914 9.91133ZM4.5764 11.9557C4.5764 11.4324 4.99848 11.0083 5.51914 11.0083C6.0398 11.0083 6.46188 11.4324 6.46188 11.9557C6.46188 12.4789 6.0398 12.903 5.51914 12.903C4.99848 12.903 4.5764 12.4789 4.5764 11.9557Z"/></svg>
+          Panel de Cohortes
+        </h2>
+        <div class="flex items-center gap-3">
+          <div v-if="hasData" class="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
+            <select v-model="promptType" class="text-xs border-none bg-transparent py-0 focus:ring-0 text-peya-navy-70 font-medium cursor-pointer">
+              <option value="expansion">Evaluar Expansión (Feriados)</option>
+              <option value="operaciones">Diagnóstico Operativo (FR & OT)</option>
+              <option value="embudo">Análisis de Embudo (CVR)</option>
+            </select>
+            <button @click="copyPrompt" :disabled="isCopying" class="text-xs font-bold text-peya-informative hover:text-peya-navy-90 transition flex items-center gap-1">
+              <svg class="w-3 h-3 fill-current" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M5.95153 5.24724C5.70896 5.24724 5.51169 5.44194 5.51169 5.68288L5.51168 7.42114C5.51168 7.66209 5.70895 7.85679 5.95152 7.85679C6.19409 7.85679 6.39136 7.66209 6.39136 7.42115L6.39136 5.68289C6.39136 5.44194 6.1941 5.24724 5.95153 5.24724Z"/><path d="M5.95153 8.14388C5.70896 8.14388 5.51169 8.33858 5.51169 8.57952L5.51168 10.3178C5.51168 10.5587 5.70895 10.7534 5.95152 10.7534C6.19409 10.7534 6.39136 10.5587 6.39136 10.3178L6.39136 8.57952C6.39136 8.33858 6.1941 8.14388 5.95153 8.14388Z"/><path fill-rule="evenodd" clip-rule="evenodd" d="M13.361 8.5753C13.3429 8.57149 13.325 8.56717 13.3073 8.56236C13.2832 8.55581 13.2595 8.54834 13.2363 8.54C12.8708 8.40899 12.61 8.06207 12.61 7.6559C12.61 7.2352 12.8898 6.87806 13.2759 6.75858C13.2891 6.75447 13.3025 6.75065 13.316 6.74711C13.3309 6.74322 13.3459 6.73968 13.361 6.73649C13.6637 6.67279 14 6.41027 14 5.99065V4.52508C14 4.10638 13.6432 3.77519 13.2219 3.80124L2.68681 4.45286C2.30108 4.47672 2 4.7934 2 5.1767V6.67847C2 7.09808 2.33631 7.3606 2.63899 7.42431C3.0684 7.51469 3.39004 7.89267 3.39004 8.34371C3.39004 8.79476 3.0684 9.17273 2.63899 9.26311C2.33631 9.32682 2 9.58934 2 10.009V11.4745C2 11.8932 2.35685 12.2244 2.77815 12.1984L13.3132 11.5467C13.6989 11.5229 14 11.2062 14 10.8229V9.32114C14 8.90153 13.6637 8.63901 13.361 8.5753ZM2.80358 6.65699C2.79926 6.65608 2.79531 6.65468 2.79188 6.65307L2.79188 5.23225L13.2081 4.58798L13.208 5.9653C13.2046 5.96689 13.2007 5.96827 13.1964 5.96917C12.4092 6.13485 11.8181 6.82641 11.8181 7.65585C11.8181 8.48529 12.4092 9.17684 13.1964 9.34253C13.2007 9.34343 13.2047 9.34483 13.2081 9.34644V10.7673L2.79189 11.4115L2.79197 10.0342C2.79537 10.0326 2.7993 10.0312 2.80358 10.0303C3.59077 9.86466 4.18192 9.1731 4.18192 8.34366C4.18192 7.51422 3.59077 6.82267 2.80358 6.65699Z"/></svg>
+              {{ isCopying ? 'Copiando...' : 'Copiar Prompt' }}
+            </button>
+          </div>
+          <button 
+            @click="aplicarFiltros" 
+            :disabled="isApplying"
+            class="px-6 py-2 bg-peya-red-50 text-peya-white font-semibold rounded-lg hover:bg-peya-red-40 transition disabled:opacity-50 flex items-center gap-2">
+            <span v-if="isApplying" class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
+            {{ isApplying ? 'Calculando...' : 'Aplicar Filtros' }}
+          </button>
+        </div>
       </div>
 
       <!-- FILTROS GLOBALES -->
       <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
         <div>
-          <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Ciudades (Log)</label>
-          <input v-model="globalFilters.cities" type="text" placeholder="Ej: Santiago, Antofagasta..." class="w-full text-sm border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" />
-          <p class="text-[10px] text-slate-400 mt-1">Separadas por coma</p>
+          <label class="block text-xs font-semibold text-peya-navy-70 uppercase mb-1">Ciudades (Log)</label>
+          <input v-model="globalFilters.cities" type="text" placeholder="Ej: Santiago, Antofagasta..." class="w-full text-sm border-slate-300 rounded-md shadow-sm focus:ring-peya-red-50 focus:border-peya-red-50" />
+          <p class="text-[10px] text-peya-navy-60 mt-1">Separadas por coma</p>
         </div>
         <div>
-          <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Zonas (Log)</label>
-          <input v-model="globalFilters.zones" type="text" placeholder="Ej: Las Condes, Centro..." class="w-full text-sm border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" />
+          <label class="block text-xs font-semibold text-peya-navy-70 uppercase mb-1">Zonas (Log)</label>
+          <input v-model="globalFilters.zones" type="text" placeholder="Ej: Las Condes, Centro..." class="w-full text-sm border-slate-300 rounded-md shadow-sm focus:ring-peya-red-50 focus:border-peya-red-50" />
         </div>
         <div>
-          <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Franquicia</label>
-          <input v-model="globalFilters.franchises" type="text" placeholder="Ej: McDonald's..." class="w-full text-sm border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" />
+          <label class="block text-xs font-semibold text-peya-navy-70 uppercase mb-1">Franquicia</label>
+          <input v-model="globalFilters.franchises" type="text" placeholder="Ej: McDonald's..." class="w-full text-sm border-slate-300 rounded-md shadow-sm focus:ring-peya-red-50 focus:border-peya-red-50" />
         </div>
         <div>
-          <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Operación</label>
-          <select v-model="globalFilters.logisticMarketplace" class="w-full text-sm border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+          <label class="block text-xs font-semibold text-peya-navy-70 uppercase mb-1">Operación</label>
+          <select v-model="globalFilters.logisticMarketplace" class="w-full text-sm border-slate-300 rounded-md shadow-sm focus:ring-peya-red-50 focus:border-peya-red-50">
             <option :value="null">Ambos (Sin filtro)</option>
             <option value="Logistic">Logistic</option>
             <option value="Marketplace">Marketplace</option>
           </select>
         </div>
         <div>
-          <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Ubicación</label>
-          <select v-model="globalFilters.isMall" class="w-full text-sm border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+          <label class="block text-xs font-semibold text-peya-navy-70 uppercase mb-1">Ubicación</label>
+          <select v-model="globalFilters.isMall" class="w-full text-sm border-slate-300 rounded-md shadow-sm focus:ring-peya-red-50 focus:border-peya-red-50">
             <option :value="null">Todos (Sin filtro)</option>
             <option :value="true">Solo Malls</option>
             <option :value="false">No Malls (Calle)</option>
@@ -55,23 +71,24 @@ const UI_Filters = {
 
       <!-- GESTIÓN DE GRUPOS -->
       <div class="flex items-center gap-3 mb-4">
-        <h3 class="text-sm font-bold text-slate-700 uppercase">Grupos de Comparación ({{ storeState.groups.length }}/4)</h3>
-        <button v-if="storeState.groups.length < 4" @click="agregarGrupo" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1 rounded-full font-medium transition">
-          + Añadir Grupo
+        <h3 class="text-sm font-bold text-peya-navy-90 uppercase">Grupos de Comparación ({{ storeState.groups.length }}/4)</h3>
+        <button v-if="storeState.groups.length < 4" @click="agregarGrupo" class="text-xs bg-transparent border border-peya-navy-60 text-peya-navy-90 hover:bg-slate-100 px-3 py-1 rounded-full font-medium transition flex items-center gap-1">
+          <svg class="w-3 h-3 fill-current" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M7.37019 2.73075C7.37019 2.32717 7.69736 2 8.10095 2C8.50453 2 8.8317 2.32717 8.8317 2.73075L8.8317 7.1683L13.2692 7.1683C13.6728 7.1683 14 7.49547 14 7.89906C14 8.30264 13.6728 8.62981 13.2692 8.62981H8.8317L8.8317 13.2692C8.8317 13.6728 8.50453 14 8.10094 14C7.69736 14 7.37019 13.6728 7.37019 13.2692L7.37019 8.62981H2.73075C2.32717 8.62981 2 8.30264 2 7.89906C2 7.49547 2.32717 7.1683 2.73075 7.1683H7.37019L7.37019 2.73075Z"/></svg>
+          Añadir Grupo
         </button>
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4">
         <div v-for="(group, index) in storeState.groups" :key="group.id" class="border border-slate-200 rounded-xl p-4 relative bg-slate-50">
-          <button v-if="storeState.groups.length > 1" @click="removerGrupo(group.id)" class="absolute top-3 right-3 text-slate-400 hover:text-red-500">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+          <button v-if="storeState.groups.length > 1" @click="removerGrupo(group.id)" class="absolute top-3 right-3 text-peya-navy-60 hover:text-peya-red-50 transition">
+            <svg class="w-4 h-4 fill-current" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M2.74465 2.73766C3.06852 2.42078 3.59193 2.42078 3.91579 2.73766L8.11718 6.84831L12.0842 2.96695C12.4081 2.65007 12.9315 2.65007 13.2554 2.96695C13.5815 3.2861 13.5815 3.80532 13.2553 4.12448L9.29429 8L13.2553 11.8755C13.5815 12.1947 13.5815 12.7139 13.2553 13.0331C12.9315 13.3499 12.4081 13.3499 12.0842 13.0331L8.11717 9.15169L3.9158 13.2623C3.59193 13.5792 3.06852 13.5792 2.74465 13.2623C2.41845 12.9432 2.41845 12.424 2.74465 12.1048L6.94006 8L2.74465 3.89518C2.41845 3.57603 2.41845 3.05681 2.74465 2.73766Z"/></svg>
           </button>
           
-          <input v-model="group.label" type="text" class="font-bold text-slate-700 bg-transparent border-none p-0 focus:ring-0 mb-3 w-4/5" />
+          <input v-model="group.label" type="text" class="font-bold text-peya-navy-90 bg-transparent border-none p-0 focus:ring-0 mb-3 w-4/5" />
           
           <div class="mb-3">
-            <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">Modo Temporal</label>
-            <select v-model="group.ui.timeMode" class="w-full text-xs border-slate-300 rounded-md shadow-sm py-1">
+            <label class="block text-[11px] font-semibold text-peya-navy-70 uppercase mb-1">Modo Temporal</label>
+            <select v-model="group.ui.timeMode" class="w-full text-xs border-slate-300 rounded-md shadow-sm py-1 focus:ring-peya-red-50 focus:border-peya-red-50">
               <option value="dates">Rango de Fechas Exactas</option>
               <option value="weeks">Semanas</option>
               <option value="months">Meses</option>
@@ -82,27 +99,27 @@ const UI_Filters = {
           <!-- Fechas Exactas -->
           <div v-if="group.ui.timeMode === 'dates'" class="flex gap-2">
             <div class="w-1/2">
-              <label class="block text-[10px] text-slate-500 mb-1">Desde</label>
-              <input v-model="group.rangoTemporal.fromDate" type="date" class="w-full text-xs border-slate-300 rounded p-1" />
+              <label class="block text-[10px] text-peya-navy-60 mb-1">Desde</label>
+              <input v-model="group.rangoTemporal.fromDate" type="date" class="w-full text-xs border-slate-300 rounded p-1 focus:ring-peya-red-50 focus:border-peya-red-50" />
             </div>
             <div class="w-1/2">
-              <label class="block text-[10px] text-slate-500 mb-1">Hasta</label>
-              <input v-model="group.rangoTemporal.toDate" type="date" class="w-full text-xs border-slate-300 rounded p-1" />
+              <label class="block text-[10px] text-peya-navy-60 mb-1">Hasta</label>
+              <input v-model="group.rangoTemporal.toDate" type="date" class="w-full text-xs border-slate-300 rounded p-1 focus:ring-peya-red-50 focus:border-peya-red-50" />
             </div>
           </div>
 
           <!-- Otros modos (Placeholder UI para extensión lógica temporal) -->
-          <div v-else class="text-xs text-amber-600 bg-amber-50 p-2 rounded border border-amber-200">
-            * El modo <b>{{ group.ui.timeMode }}</b> requiere lógica auxiliar para mapear a fromDate/toDate. Se enviará el rango configurado por defecto temporalmente.
+          <div v-else class="text-xs text-peya-navy-70 bg-peya-deals-comms/20 p-2 rounded border border-peya-deals-comms/40">
+            * El modo <b>{{ group.ui.timeMode }}</b> requiere lógica auxiliar para mapear a fromDate/toDate.
           </div>
 
           <!-- Loading State Local -->
-          <div v-if="group.loading" class="mt-4 p-3 bg-blue-50 rounded-lg flex items-center justify-center gap-2">
-            <span class="animate-spin h-3 w-3 border-2 border-blue-600 border-t-transparent rounded-full"></span>
-            <span class="text-xs text-blue-700 font-medium">Consultando BQ...</span>
+          <div v-if="group.loading" class="mt-4 p-3 bg-peya-background rounded-lg flex items-center justify-center gap-2 border border-slate-200">
+            <span class="animate-spin h-3 w-3 border-2 border-peya-red-50 border-t-transparent rounded-full"></span>
+            <span class="text-xs text-peya-navy-90 font-medium">Consultando BQ...</span>
           </div>
           
-          <div v-if="group.error" class="mt-4 p-2 bg-red-50 text-red-600 text-[10px] rounded border border-red-100">
+          <div v-if="group.error" class="mt-4 p-2 bg-peya-red-20/20 text-peya-red-70 text-[10px] rounded border border-peya-red-20">
             {{ group.error }}
           </div>
         </div>
@@ -162,7 +179,7 @@ const UI_Filters = {
           group.loading = true;
           group.error = null;
 
-          // Combinar filtros globales con el rango temporal del grupo[cite: 3]
+          // Combinar filtros globales con el rango temporal del grupo
           const reqPayload = {
             ...payloadBase,
             fromDate: group.rangoTemporal.fromDate,
@@ -186,12 +203,43 @@ const UI_Filters = {
               console.error('Error BQ Grupo', group.id, err);
               resolve({ success: false, id: group.id });
             })
-            .fetchDashboardData(reqPayload); // Llama a Controller.gs[cite: 3]
+            .fetchDashboardData(reqPayload); // Llama a Controller.gs
         });
       });
 
       await Promise.all(promises);
       isApplying.value = false;
+    };
+
+    // --- LÓGICA DE EXTRACCIÓN PARA IA ---
+    const hasData = Vue.computed(() => storeState.groups.some(g => g.aggregatedData && g.aggregatedData.timeSeries.length > 0));
+    const promptType = ref('expansion');
+    const isCopying = ref(false);
+
+    const copyPrompt = async () => {
+      isCopying.value = true;
+      try {
+        const prompts = {
+          expansion: "Actúa como Estratega de Expansión y Operaciones. Nuestro objetivo es decidir si debemos operar durante Fiestas Patrias (u otro feriado crítico) en una ciudad donde históricamente hemos apagado la operación. Analiza la resiliencia operativa (caída de open_time_pct y aumento de fail_rate) y la elasticidad de la demanda (city_total_sessions) en los escenarios proxy adjuntos. Proyecta qué pasaría si abrimos esta ciudad. Dame un veredicto definitivo: ABRIR, CERRAR, o ABRIR CON CONDICIONES (y cuáles).",
+          operaciones: "Actúa como un Analista de Datos Senior. Cruza las métricas de degradación operativa (fail_rate y open_time_pct) con el volumen de confirmed_orders para cada cohorte adjunta. Determina si existe una correlación estadísticamente relevante entre el incumplimiento de horarios o los rechazos de órdenes y la pérdida general de volumen. Señala el día o grupo con la anomalía operativa más crítica.",
+          embudo: "Actúa como un Analista de Datos Senior. Adjunto un dataset en formato JSON con el rendimiento de múltiples cohortes. Analiza la evolución del embudo de conversión utilizando las métricas de city_cvr_2, city_cvr_3 y city_cvr_neto. Identifica en qué etapa exacta se genera la mayor fricción y propón 3 hipótesis concretas (operativas o de catálogo) que expliquen la caída entre los grupos."
+        };
+
+        const dataToCopy = storeState.groups.map(g => ({
+          cohorte: g.label,
+          parametros_aplicados: { ...globalFilters, desde: g.rangoTemporal.fromDate, hasta: g.rangoTemporal.toDate },
+          resumen_diario: g.aggregatedData.timeSeries
+        }));
+
+        const finalString = `${prompts[promptType.value]}\n\n### DATASET (JSON)\n\`\`\`json\n${JSON.stringify(dataToCopy, null, 2)}\n\`\`\``;
+        
+        await navigator.clipboard.writeText(finalString);
+        alert('¡Prompt y dataset copiados al portapapeles! Pégalo en tu IA de preferencia.');
+      } catch (err) {
+        console.error(err);
+        alert('Error al copiar al portapapeles. Permisos denegados.');
+      }
+      isCopying.value = false;
     };
 
     return {
@@ -200,7 +248,11 @@ const UI_Filters = {
       isApplying,
       agregarGrupo,
       removerGrupo,
-      aplicarFiltros
+      aplicarFiltros,
+      hasData,
+      promptType,
+      isCopying,
+      copyPrompt
     };
   }
 };

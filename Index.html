@@ -5,8 +5,30 @@
   <meta charset="UTF-8">
   <title>Dates Analytics Log</title>
 
+  <!-- Tipografía Oficial PeYa -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Outfit', 'sans-serif'] },
+          colors: {
+            peya: {
+              'red-50': '#EA044E', 'red-40': '#EC1D60', 'red-70': '#B40443', 'red-20': '#F481A6',
+              'navy-90': '#100423', 'navy-70': '#4C4359', 'navy-60': '#70697A',
+              'informative': '#04ADDF', 'deals-comms': '#F8EA46', 'accent': '#72E6FF',
+              'positive': '#2DE1A0', 'background': '#F8F9FA', 'white': '#FFFFFF'
+            }
+          }
+        }
+      }
+    }
+  </script>
 
   <!-- Vue 3 -->
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
@@ -16,10 +38,15 @@
 
   <?!= include('Styles'); ?>
 </head>
-<body class="bg-slate-50 text-slate-800">
+<body class="bg-peya-background text-peya-navy-90 font-sans">
 
   <div id="app" class="min-h-screen p-8 flex flex-col items-center">
-    <h1 class="text-2xl font-semibold mb-6">{{ titulo }}</h1>
+    <div class="w-full max-w-7xl flex items-center gap-3 mb-6">
+      <svg class="w-8 h-8 fill-current text-peya-red-50" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+        <path d="M9.67491 2.8999H9.553H9.00353H2.67668C2.5791 2.8999 2.5 2.97728 2.5 3.07274V4.05789C2.5 5.13292 3.27562 5.72574 4.68375 5.72574H9.67491C10.1863 5.74726 10.5897 6.15914 10.5897 6.65991C10.5897 7.16068 10.1863 7.57255 9.67491 7.59408H4.07951C3.99601 7.59794 3.92671 7.65852 3.91343 7.73926L2.58304 12.85C2.56963 12.9017 2.58137 12.9565 2.61484 12.9986C2.6482 13.041 2.69974 13.0659 2.75442 13.066H4.5212C5.0233 13.0557 5.45682 12.7193 5.58127 12.2433L6.11131 10.3836H9.67491C11.7874 10.3836 13.5 8.70833 13.5 6.64176C13.5 4.57519 11.7874 2.8999 9.67491 2.8999Z"/>
+      </svg>
+      <h1 class="text-2xl font-bold tracking-tight">{{ titulo }}</h1>
+    </div>
     
     <!-- Renderizado del componente Fase 3 -->
     <ui-filters></ui-filters>
@@ -47,7 +74,7 @@
 
     const app = createApp({
       setup() {
-        const titulo = ref('Dates Analytics Log — Fase 3');
+        const titulo = ref('Dates Analytics Log');
         return { titulo };
       }
     });

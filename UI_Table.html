@@ -36,17 +36,18 @@ const UI_Table = {
               <th v-for="col in columns" :key="col.key" @click="sortBy(col.key)" class="px-4 py-3 cursor-pointer hover:bg-slate-100 select-none whitespace-nowrap">
                 <div class="flex items-center gap-1">
                   {{ col.label }}
-                  <span v-if="sortKey === col.key" class="text-blue-600">
-                    {{ sortAsc ? '↑' : '↓' }}
+                  <span v-if="sortKey === col.key" class="text-peya-red-50 flex items-center">
+                    <svg v-if="sortAsc" class="w-3 h-3 fill-current" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M13.2231 6.81308C13.459 7.04136 13.459 7.41137 13.2231 7.63965C12.9872 7.86803 12.6046 7.86803 12.3686 7.63965L8.81235 4.19761C8.77696 4.16336 8.72447 4.15357 8.67907 4.17273C8.63367 4.1919 8.60417 4.23632 8.60417 4.2855L8.60417 13.4154C8.60417 13.7379 8.33402 14 8.00002 14C7.66603 14 7.39588 13.7379 7.39588 13.4154L7.39588 4.2855C7.39588 4.23632 7.36638 4.1919 7.32098 4.17273C7.27558 4.15357 7.22308 4.16336 7.1877 4.19761L3.63142 7.63965C3.39547 7.86803 3.01287 7.86803 2.77691 7.63965C2.54106 7.41137 2.54106 7.04136 2.77691 6.81308L7.57277 2.17128C7.68083 2.06669 7.82983 2.00147 7.99448 2.00003L7.99949 2L8.00056 2L8.0056 2.00003C8.08533 2.00076 8.16173 2.01646 8.23134 2.0444C8.30263 2.07296 8.36945 2.1153 8.42728 2.17128L13.2231 6.81308Z"/></svg>
+                    <svg v-else class="w-3 h-3 fill-current" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M2.77687 9.18692C2.54101 8.95864 2.54101 8.58863 2.77687 8.36035C3.01282 8.13197 3.39542 8.13197 3.63137 8.36035L7.18765 11.8024C7.22304 11.8366 7.27553 11.8464 7.32093 11.8273C7.36633 11.8081 7.39583 11.7637 7.39583 11.7145L7.39583 2.58457C7.39583 2.26206 7.66598 2 7.99998 2C8.33397 2 8.60412 2.26206 8.60412 2.58457L8.60412 11.7145C8.60412 11.7637 8.63362 11.8081 8.67902 11.8273C8.72442 11.8464 8.77692 11.8366 8.8123 11.8024L12.3686 8.36035C12.6045 8.13197 12.9871 8.13197 13.2231 8.36035C13.4589 8.58863 13.4589 8.95864 13.2231 9.18692L8.42723 13.8287C8.31917 13.9333 8.17017 13.9985 8.00552 14L8.00051 14L7.99944 14L7.9944 14C7.91467 13.9992 7.83827 13.9835 7.76866 13.9556C7.69737 13.927 7.63055 13.8847 7.57272 13.8287L2.77687 9.18692Z"/></svg>
                   </span>
                 </div>
               </th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100">
-            <tr v-for="partner in sortedPartners" :key="partner.vendor_code" class="hover:bg-blue-50/50 transition-colors">
-              <td class="px-4 py-2 font-medium text-slate-800">{{ partner.vendor_code }}</td>
-              <td class="px-4 py-2 font-medium text-slate-800 truncate max-w-[200px]" :title="partner.partner_name">{{ partner.partner_name }}</td>
+            <tr v-for="partner in sortedPartners" :key="partner.vendor_code" class="hover:bg-slate-50 transition-colors">
+              <td class="px-4 py-2 font-medium text-peya-navy-90">{{ partner.vendor_code }}</td>
+              <td class="px-4 py-2 font-medium text-peya-navy-90 truncate max-w-[200px]" :title="partner.partner_name">{{ partner.partner_name }}</td>
               <td class="px-4 py-2 truncate max-w-[150px]">{{ partner.franchise_name }}</td>
               <td class="px-4 py-2">
                 <span :class="['px-2 py-1 text-[10px] rounded-full font-medium', partner.is_logistic_marketplace === 'Logistic' ? 'bg-purple-100 text-purple-700' : 'bg-orange-100 text-orange-700']">
@@ -54,8 +55,11 @@ const UI_Table = {
                 </span>
               </td>
               <td class="px-4 py-2 text-center">
-                <span v-if="partner.is_mall" class="text-emerald-600 font-bold" title="Mall">✓</span>
-                <span v-else class="text-slate-300">-</span>
+                <svg v-if="partner.is_mall" class="w-4 h-4 mx-auto fill-current text-peya-positive" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M10.8152 5.74029C10.5871 5.55592 10.2522 5.59046 10.0669 5.81785L6.99035 9.73215L5.84179 8.50727L5.82882 8.49806C5.58973 8.32827 5.25765 8.38349 5.0869 8.62204C4.91871 8.85702 4.97011 9.18174 5.19964 9.35417L6.75022 10.9059L6.76112 10.9136C6.98975 11.076 7.30572 11.0335 7.48291 10.816L10.8939 6.4862C11.0785 6.25846 11.0432 5.92467 10.8152 5.74029Z"/>
+                  <path fill-rule="evenodd" clip-rule="evenodd" d="M8 1.5C4.41015 1.5 1.5 4.41015 1.5 8C1.5 11.5899 4.41015 14.5 8 14.5C11.5899 14.5 14.5 11.5899 14.5 8C14.5 4.41015 11.5899 1.5 8 1.5ZM2.53497 8C2.53497 4.98175 4.98175 2.53497 8 2.53497C11.0183 2.53497 13.465 4.98175 13.465 8C13.465 11.0183 11.0183 13.465 8 13.465C4.98175 13.465 2.53497 11.0183 2.53497 8Z"/>
+                </svg>
+                <span v-else class="text-peya-navy-60">-</span>
               </td>
               <td class="px-4 py-2 text-right">{{ formatNum(partner.total_orders) }}</td>
               <td class="px-4 py-2 text-right text-red-600">{{ formatNum(partner.rejected_orders) }}</td>
