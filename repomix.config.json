@@ -1,0 +1,20 @@
+{
+  "output": {
+    "filePath": "Docs/PROJECT_MAP.md",
+    "style": "markdown"
+  },
+  "ignore": {
+    "useGitignore": true,
+    "customPatterns": [
+      "Docs/**",
+      "**/assets/**",
+      "**/logs/**",
+      "**/tests/**",
+      "**/*.log",
+      "**/.venv/**",
+      "**/__pycache__/**",
+      "repomix.config.json",
+      "README.md"
+    ]
+  }
+}

@@ -33,6 +33,31 @@ Copia esta plantilla al inicio del archivo (justo debajo de este bloque de instr
 
 ## Entradas
 
+## [Fecha: 2026-09-02] — Refactor UI, Design System y Herramientas Analíticas IA
+
+- **Hora de inicio – Hora de cierre:** 16:30 – 20:15
+- **Duración total:** 3.75 horas
+- **Fase / Subfase relacionada:** Fase Frontend — Estilos Corporativos y Evolución Analítica
+- **Objetivo de la sesión:** Migrar la interfaz genérica al PeYa Design System, habilitar comparativas de múltiples métricas con escalas independientes en ECharts e integrar herramientas de exportación para análisis predictivo con IA.
+
+### Archivos creados/modificados
+- `Styles.html` e `Index.html` — Inyectada la tipografía "Outfit", las variables CSS de la paleta oficial (`--peya-*`)[cite: 2, 4] y la configuración extendida de Tailwind. Añadido logotipo corporativo[cite: 3].
+- `UI_Table.html` — Reemplazados caracteres ASCII rudimentarios por SVGs corporativos (Check, ArrowUp, ArrowDown)[cite: 1, 7]. Aplicación de paleta semántica (`peya-positive`, `peya-red-50`).
+- `UI_Charts.html` — Refactor profundo para soportar un array dinámico de métricas (multi-selección). Implementación de Eje Y Dual (Dual Y-Axis) nativo de ECharts para evitar el aplanamiento al mezclar volúmenes altos y porcentajes[cite: 11]. Mapeo de leyendas cortas para optimizar espacio visual.
+- `UI_Filters.html` — Interfaz actualizada con iconos corporativos SVG (Add, Close, Filter)[cite: 1, 15]. Desarrollo de la función `copyPrompt` que empaqueta la vista actual de datos (JSON de `timeSeries`) junto con directrices analíticas predefinidas (Expansión/Feriados, Salud Operativa, Embudo) directo al portapapeles[cite: 15].
+
+### Decisiones tomadas
+- **Ejes Duales en ECharts:** Se integró un selector para que el analista asigne cada métrica al eje izquierdo (absolutos) o derecho (porcentajes), manteniendo la coherencia visual y matemática.
+- **Exportación a LLMs:** En lugar de crear un backend propio de IA (con costos asociados y gestión de API keys), se optó por una arquitectura "Copiar Prompt". Esto centraliza el estado en el frontend y delega la inferencia pesada a la herramienta que elija el analista.
+- **Iconografía Estricta:** Se eliminó cualquier dependencia a librerías externas o texto plano, obligando el uso exclusivo del código vectorial del catálogo oficial `ICONOS.txt`[cite: 1].
+
+### Pendientes para la próxima sesión
+- **Hotfix de Cold Start en BigQuery:** Modificar el `LEFT JOIN` en `Service_BigQuery.gs` para asegurar que el cruce de sesiones y logística se realice a nivel de "Ciudad Perseus", previniendo que los días con 0 órdenes desaparezcan de los reportes (crítico para proyectar aperturas en feriados).
+
+### Criterio de éxito de la subfase
+- [x] Cumplido — La UI refleja 100% el Design System, los gráficos manejan escenarios multi-métrica asimétricos sin romper la escala, y el puente analítico para modelos fundacionales de IA está operativo.
+---
+
 ## [Fecha: 2026-09-02] — Desarrollo Core, Integración UI y Estabilización de BigQuery
 
 - **Hora de inicio – Hora de cierre:** 14:00 – 16:30
@@ -58,3 +83,34 @@ Copia esta plantilla al inicio del archivo (justo debajo de este bloque de instr
 
 ### Criterio de éxito de la subfase
 - [x] Cumplido — El dashboard conecta sin errores de permisos, los filtros responden sin colapsar la memoria, y los componentes visuales (ECharts y Tabla de Ranking) renderizan exitosamente los datos históricos reales.
+
+---
+
+## [Fecha: 2026-09-04] — Intento de Fix #1 (Tabla de Partners) — no resuelto + regresión introducida y corregida
+
+- **Hora de inicio – Hora de cierre:** 16:45 – 22:45
+- **Duración total:** 6 horas
+- **Fase / Subfase relacionada:** REFACTOR_PLAN.md — Fix #1 (Tabla de Partners desaparecida)
+- **Objetivo de la sesión:** Diagnosticar y corregir por qué la tabla de ranking de partners no se renderiza pese a que los gráficos sí muestran datos.
+
+### Archivos creados/modificados
+- `Store.html` — Se agregó `state.version` (contador) y `Vue.markRaw(rawData)` en `setGroupRawData()`, para reemplazar los `watch(deep:true)` existentes por una señal liviana.
+- `UI_Charts.html` — Se reemplazó `watch(storeState.groups, {deep:true})` por `watch(storeState.version)`. Esto introdujo una **regresión**: los gráficos dejaron de renderizarse automáticamente al aplicar filtros y solo aparecían al tildar "Etiquetas" o "Fusionar Grupos". Causa: `watch()` usa `flush:'pre'` por defecto, y el callback corría antes de que Vue creara los `<div id="chart-...">` en el DOM (recién existen cuando `v-if="hasData"` pasa a `true` en el mismo ciclo). Se corrigió agregando `{ flush: 'post' }` al watcher.
+- `UI_Table.html` — Se reemplazó el `watch(groupsWithData, {deep:true})` por la misma sin `deep`, y se separaron los estados `anyLoading`/`anyError`/con-datos en el template.
+
+### Decisiones tomadas
+- Se descartó la hipótesis original ("deep-watchers costosos son la causa raíz de la tabla ausente"): tras revisar los 5 archivos involucrados (`Store.html`, `UI_Charts.html`, `UI_Table.html`, `UI_Filters.html`, `Index.html`) no se encontró ningún bug de código que explique que `groupsWithData` de la tabla esté vacío mientras el de los gráficos no — ambos nacen del mismo `aggregatedData`.
+- **El problema original (tabla de partners no aparece) sigue sin resolverse.** Los cambios de esta sesión corrigieron una regresión que ellos mismos introdujeron, pero no el bug que motivó el fix.
+- Se identificaron 2 causas no descartadas, ninguna de código: (a) deployment de GAS desactualizado (probar contra `/dev` o crear nueva versión), (b) pendiente de diagnóstico en vivo vía consola del navegador.
+
+### Pendientes para la próxima sesión
+- Correr en consola del navegador (con datos cargados) y registrar el resultado:
+```javascript
+  Store.state.groups.map(g => ({ label: g.label, loading: g.loading, error: g.error,
+    timeSeries: g.aggregatedData.timeSeries.length, partnerTotals: g.aggregatedData.partnerTotals.length }))
+```
+- Revisar consola por errores de JS no reportados aún.
+- Retomar Fix #1 con esa evidencia antes de tocar más código.
+
+### Criterio de éxito de la subfase
+- [X] No cumplido — la tabla de partners sigue sin aparecer. Se corrigió (no se dejó pendiente) la regresión de renderizado de gráficos introducida por este mismo intento.
