@@ -607,6 +607,37 @@ function _getMallsPolygonsCte_() {
 }
 ```
 
+## File: Config.gs
+```
+/**
+ * Config.gs
+ * Configuración central del proyecto. Nada de valores de negocio hardcodeados:
+ * fechas, ciudades, zonas, etc. siempre llegan como parámetros desde el frontend
+ * y viajan como Query Parameters de BigQuery (nunca concatenados en el SQL).
+ */
+
+const BQ_CONFIG = {
+  PROJECT_ID: 'peya-chile',
+  LOCATION: 'US', // TODO: confirmar región real de los datasets si las queries fallan por location mismatch
+
+  // Tablas reales que usa la Query Maestra (ver Service_BigQuery.gs)
+  TABLES: {
+    SESSIONS: 'peya-bi-tools-pro.il_sessions.fact_perseus_sessions',
+    LOGISTIC_ORDERS: 'peya-bi-tools-pro.il_logistics.fact_logistic_orders',
+    ORDERS: 'peya-bi-tools-pro.il_core.fact_orders',
+    PARTNER: 'peya-bi-tools-pro.il_core.dim_partner',
+    AREA: 'peya-bi-tools-pro.il_core.dim_area',
+    HISTORICAL_PARTNERS: 'peya-bi-tools-pro.il_core.dim_historical_partners'
+  },
+
+  COUNTRY_ID: 2 // Chile
+};
+
+// Límite de seguridad: rango máximo de días por grupo para no escanear
+// datasets completos sin querer. Ajustar según performance real observada.
+const MAX_DATE_RANGE_DAYS = 186; // ~6 meses
+```
+
 ## File: Store.html
 ```html
 <script>
@@ -912,37 +943,6 @@ const Store = (function () {
 </script>
 ```
 
-## File: Config.gs
-```
-/**
- * Config.gs
- * Configuración central del proyecto. Nada de valores de negocio hardcodeados:
- * fechas, ciudades, zonas, etc. siempre llegan como parámetros desde el frontend
- * y viajan como Query Parameters de BigQuery (nunca concatenados en el SQL).
- */
-
-const BQ_CONFIG = {
-  PROJECT_ID: 'peya-chile',
-  LOCATION: 'US', // TODO: confirmar región real de los datasets si las queries fallan por location mismatch
-
-  // Tablas reales que usa la Query Maestra (ver Service_BigQuery.gs)
-  TABLES: {
-    SESSIONS: 'peya-bi-tools-pro.il_sessions.fact_perseus_sessions',
-    LOGISTIC_ORDERS: 'peya-bi-tools-pro.il_logistics.fact_logistic_orders',
-    ORDERS: 'peya-bi-tools-pro.il_core.fact_orders',
-    PARTNER: 'peya-bi-tools-pro.il_core.dim_partner',
-    AREA: 'peya-bi-tools-pro.il_core.dim_area',
-    HISTORICAL_PARTNERS: 'peya-bi-tools-pro.il_core.dim_historical_partners'
-  },
-
-  COUNTRY_ID: 2 // Chile
-};
-
-// Límite de seguridad: rango máximo de días por grupo para no escanear
-// datasets completos sin querer. Ajustar según performance real observada.
-const MAX_DATE_RANGE_DAYS = 186; // ~6 meses
-```
-
 ## File: Styles.html
 ```html
 <style>
@@ -975,269 +975,6 @@ const MAX_DATE_RANGE_DAYS = 186; // ~6 meses
     color: var(--peya-navy-90);
   }
 </style>
-```
-
-## File: UI_Charts.html
-```html
-<script>
-const UI_Charts = {
-  template: `
-    <div v-if="hasData" class="w-full max-w-7xl mx-auto bg-peya-white shadow-sm rounded-xl border border-slate-200 p-6 mb-6">
-      
-      <!-- Controles del Gráfico -->
-      <div class="flex flex-col mb-6 border-b border-slate-100 pb-4 gap-4">
-        <div class="flex flex-wrap justify-between items-center w-full">
-          <h2 class="text-xl font-bold text-peya-navy-90">Tendencias Temporales</h2>
-          <div class="flex items-center gap-4">
-            <label class="flex items-center gap-2 cursor-pointer bg-slate-100 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition">
-              <input type="checkbox" v-model="config.showLabels" @change="renderCharts" class="rounded text-peya-red-50 focus:ring-peya-red-50" />
-              <span class="text-sm font-medium text-peya-navy-90">Etiquetas</span>
-            </label>
-            <label class="flex items-center gap-2 cursor-pointer bg-slate-100 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition">
-              <input type="checkbox" v-model="config.merged" @change="renderCharts" class="rounded text-peya-red-50 focus:ring-peya-red-50" />
-              <span class="text-sm font-medium text-peya-navy-90">Fusionar Grupos</span>
-            </label>
-            <button @click="addMetric" class="text-xs bg-transparent border border-peya-navy-60 text-peya-navy-90 hover:bg-slate-100 px-3 py-1.5 rounded-full font-medium transition flex items-center gap-1">
-              <svg class="w-3 h-3 fill-current" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M7.37019 2.73075C7.37019 2.32717 7.69736 2 8.10095 2C8.50453 2 8.8317 2.32717 8.8317 2.73075L8.8317 7.1683L13.2692 7.1683C13.6728 7.1683 14 7.49547 14 7.89906C14 8.30264 13.6728 8.62981 13.2692 8.62981H8.8317L8.8317 13.2692C8.8317 13.6728 8.50453 14 8.10094 14C7.69736 14 7.37019 13.6728 7.37019 13.2692L7.37019 8.62981H2.73075C2.32717 8.62981 2 8.30264 2 7.89906C2 7.49547 2.32717 7.1683 2.73075 7.1683H7.37019L7.37019 2.73075Z"/></svg>
-              Añadir Métrica
-            </button>
-          </div>
-        </div>
-
-        <!-- Lista de métricas configuradas -->
-        <div class="flex flex-wrap gap-3">
-          <div v-for="(cfg, idx) in config.metrics" :key="idx" class="flex items-center gap-2 bg-slate-50 border border-slate-200 p-2 rounded-lg relative pr-8">
-            <button v-if="config.metrics.length > 1" @click="removeMetric(idx)" class="absolute top-2.5 right-2 text-peya-navy-60 hover:text-peya-red-50">
-              <svg class="w-3 h-3 fill-current" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M2.74465 2.73766C3.06852 2.42078 3.59193 2.42078 3.91579 2.73766L8.11718 6.84831L12.0842 2.96695C12.4081 2.65007 12.9315 2.65007 13.2554 2.96695C13.5815 3.2861 13.5815 3.80532 13.2553 4.12448L9.29429 8L13.2553 11.8755C13.5815 12.1947 13.5815 12.7139 13.2553 13.0331C12.9315 13.3499 12.4081 13.3499 12.0842 13.0331L8.11717 9.15169L3.9158 13.2623C3.59193 13.5792 3.06852 13.5792 2.74465 13.2623C2.41845 12.9432 2.41845 12.424 2.74465 12.1048L6.94006 8L2.74465 3.89518C2.41845 3.57603 2.41845 3.05681 2.74465 2.73766Z"/></svg>
-            </button>
-            <select v-model="cfg.id" @change="renderCharts" class="text-xs border-slate-300 rounded shadow-sm focus:ring-peya-red-50 focus:border-peya-red-50">
-              <option value="total_orders">Órdenes Totales</option>
-              <option value="confirmed_orders">Órdenes Confirmadas</option>
-              <option value="rejected_orders">Órdenes Rechazadas</option>
-              <option value="fail_rate">Fail Rate %</option>
-              <option value="city_total_sessions">Sesiones de Ciudad</option>
-              <option value="city_cvr_neto">City CVR Neto</option>
-              <option value="city_cvr_2">City CVR 2</option>
-              <option value="city_cvr_3">City CVR 3</option>
-              <option value="open_time_pct">Cumplimiento Open Time %</option>
-            </select>
-            <select v-model="cfg.type" @change="renderCharts" class="text-xs border-slate-300 rounded shadow-sm focus:ring-peya-red-50 focus:border-peya-red-50">
-              <option value="line">Línea</option>
-              <option value="area">Área</option>
-              <option value="bar">Barra</option>
-            </select>
-            <select v-model="cfg.axis" @change="renderCharts" class="text-xs border-slate-300 rounded shadow-sm focus:ring-peya-red-50 focus:border-peya-red-50">
-              <option value="left">Eje Izq (I)</option>
-              <option value="right">Eje Der (D)</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      <!-- Lienzos de Gráficos -->
-      <div v-if="config.merged" id="chart-merged" class="w-full h-96"></div>
-      
-      <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div v-for="group in groupsWithData" :key="group.id" class="border border-slate-100 rounded-lg p-2 bg-slate-50">
-          <h3 class="text-center text-sm font-bold text-peya-navy-70 mb-2">{{ group.label }}</h3>
-          <div :id="'chart-' + group.id" class="w-full h-72"></div>
-        </div>
-      </div>
-
-    </div>
-  `,
-  setup() {
-    const { computed, reactive, watch, nextTick, onUnmounted } = Vue;
-    const storeState = Store.state;
-    let chartInstances = [];
-
-    // Ahora soporta múltiples métricas por defecto
-    const config = reactive({
-      metrics: [{ id: 'total_orders', type: 'bar', axis: 'left' }],
-      merged: false,
-      showLabels: false
-    });
-
-    const addMetric = () => {
-      config.metrics.push({ id: 'fail_rate', type: 'line', axis: 'right' });
-      renderCharts();
-    };
-
-    const removeMetric = (index) => {
-      config.metrics.splice(index, 1);
-      renderCharts();
-    };
-
-    const groupsWithData = computed(() => {
-      return storeState.groups.filter(g => g.aggregatedData && g.aggregatedData.timeSeries.length > 0);
-    });
-
-    const hasData = computed(() => groupsWithData.value.length > 0);
-
-    const formatValue = (val, metric) => {
-      if (['fail_rate', 'open_time_pct', 'city_cvr_neto', 'city_cvr_2', 'city_cvr_3'].includes(metric)) {
-        return (val * 100).toFixed(2) + '%';
-      }
-      return val.toLocaleString('es-CL');
-    };
-
-    // Mapeo corto para ahorrar espacio en las leyendas de ECharts
-    const legendLabels = {
-      total_orders: 'Total Orders',
-      confirmed_orders: 'Confirmed',
-      rejected_orders: 'Rejected',
-      fail_rate: '% FR',
-      city_total_sessions: 'Sessions',
-      city_cvr_neto: '% CVR Neto',
-      city_cvr_2: '% CVR2',
-      city_cvr_3: '% CVR3',
-      open_time_pct: '% OT'
-    };
-
-    const disposeCharts = () => {
-      chartInstances.forEach(instance => instance.dispose());
-      chartInstances = [];
-    };
-
-    const renderCharts = async () => {
-      if (!hasData.value || config.metrics.length === 0) return;
-      
-      await nextTick();
-      disposeCharts();
-
-      // Colores corporativos base, expandidos con variaciones tonales coherentes[cite: 10]
-      const peyaColors = [
-        '#EA044E', '#4C4359', '#04ADDF', '#2DE1A0', 
-        '#EC1D60', '#70697A', '#72E6FF', '#F8EA46',
-        '#B40443', '#100423'
-      ];
-
-      // Configuración nativa ECharts para Eje Y Dual
-      const dualYAxis = [
-        { type: 'value', position: 'left' },
-        { type: 'value', position: 'right', splitLine: { show: false } } // Ocultar líneas del eje secundario para evitar ruido
-      ];
-
-      if (config.merged) {
-        // --- MODO FUSIONADO ---
-        const dom = document.getElementById('chart-merged');
-        if (!dom) return;
-        
-        const chart = echarts.init(dom);
-        chartInstances.push(chart);
-
-        const allDates = new Set();
-        groupsWithData.value.forEach(g => {
-          g.aggregatedData.timeSeries.forEach(d => allDates.add(d.fecha));
-        });
-        const xAxisData = Array.from(allDates).sort();
-
-        // En merged mode, las series son: (Grupos * Métricas)
-        let series = [];
-        let colorIdx = 0;
-
-        groupsWithData.value.forEach(g => {
-          const dataMap = new Map(g.aggregatedData.timeSeries.map(d => [d.fecha, d]));
-          
-          config.metrics.forEach(cfg => {
-            series.push({
-              name: `${g.label} - ${legendLabels[cfg.id]}`,
-              type: cfg.type === 'area' ? 'line' : cfg.type,
-              smooth: true,
-              yAxisIndex: cfg.axis === 'right' ? 1 : 0,
-              data: xAxisData.map(fecha => {
-                const row = dataMap.get(fecha);
-                return row ? row[cfg.id] : 0;
-              }),
-              areaStyle: cfg.type === 'area' ? { opacity: 0.1 } : null,
-              label: {
-                show: config.showLabels,
-                position: 'top',
-                formatter: (p) => formatValue(p.value, cfg.id)
-              },
-              itemStyle: { color: peyaColors[colorIdx % peyaColors.length] }
-            });
-            colorIdx++;
-          });
-        });
-
-        chart.setOption({
-          tooltip: { trigger: 'axis' },
-          legend: { top: 'bottom', type: 'scroll' },
-          grid: { left: '3%', right: '4%', bottom: '15%', containLabel: true },
-          xAxis: { type: 'category', data: xAxisData },
-          yAxis: dualYAxis,
-          series: series
-        });
-
-      } else {
-        // --- MODO SEPARADO (SINCRONIZADO) ---
-        groupsWithData.value.forEach((g, index) => {
-          const dom = document.getElementById('chart-' + g.id);
-          if (!dom) return;
-
-          const chart = echarts.init(dom);
-          chartInstances.push(chart);
-
-          const xAxisData = g.aggregatedData.timeSeries.map(d => d.fecha);
-          
-          const series = config.metrics.map((cfg, mIdx) => {
-            const seriesData = g.aggregatedData.timeSeries.map(d => d[cfg.id]);
-            return {
-              name: legendLabels[cfg.id],
-              type: cfg.type === 'area' ? 'line' : cfg.type,
-              smooth: true,
-              yAxisIndex: cfg.axis === 'right' ? 1 : 0,
-              data: seriesData,
-              areaStyle: cfg.type === 'area' ? { opacity: 0.1 } : null,
-              label: {
-                show: config.showLabels,
-                position: 'top',
-                formatter: (p) => formatValue(p.value, cfg.id)
-              },
-              itemStyle: { color: peyaColors[mIdx % peyaColors.length] }
-            };
-          });
-
-          chart.setOption({
-            tooltip: { trigger: 'axis' },
-            legend: { top: 'top', type: 'scroll' },
-            grid: { left: '5%', right: '5%', bottom: '10%', top: '15%', containLabel: true },
-            xAxis: { type: 'category', data: xAxisData },
-            yAxis: dualYAxis,
-            series: series
-          });
-        });
-
-        echarts.connect(chartInstances);
-      }
-    };
-    
-    // Escuchar cambios de versión (Store.state.version se incrementa una vez
-    // por carga de grupo, no por cada campo interno de rawData) — evita un
-    // deep-watch carísimo sobre datasets de miles de filas.
-    // flush: 'post' es obligatorio acá: sin esto, el callback corre ANTES de
-    // que Vue cree los <div id="chart-..."> que aparecen recién cuando
-    // v-if="hasData" pasa a true en el mismo ciclo — document.getElementById
-    // devuelve null y el gráfico queda en blanco hasta el próximo trigger manual.
-    watch(() => storeState.version, () => {
-      renderCharts();
-    }, { flush: 'post' });
-
-    // Limpiar memoria al desmontar
-    onUnmounted(() => disposeCharts());
-
-    return {
-      config,
-      hasData,
-      groupsWithData,
-      addMetric,
-      removeMetric,
-      renderCharts
-    };
-  }
-};
-</script>
 ```
 
 ## File: UI_Filters.html
@@ -1503,192 +1240,6 @@ const UI_Filters = {
 </script>
 ```
 
-## File: UI_Table.html
-```html
-<script>
-/**
- * Componente Vue: UI_Table
- * Tabla de ranking a nivel de partner con virtual/sticky scrolling,
- * pestañas por grupo y ordenamiento dinámico.
- */
-const UI_Table = {
-  template: `
-        <div v-if="anyLoading" class="w-full max-w-7xl mx-auto bg-white shadow-sm rounded-xl border border-slate-200 p-8 mb-12 text-center text-sm text-slate-400">
-      Cargando ranking de partners…
-    </div>
-    <div v-else-if="anyError" class="w-full max-w-7xl mx-auto bg-white shadow-sm rounded-xl border border-red-200 p-8 mb-12 text-center text-sm text-red-600">
-      {{ anyError }}
-    </div>
-    <div v-else-if="groupsWithData.length > 0" class="w-full max-w-7xl mx-auto bg-white shadow-sm rounded-xl border border-slate-200 overflow-hidden mb-12">
-      
-      <!-- HEADER & TABS -->
-      <div class="px-6 pt-6 border-b border-slate-200">
-        <h2 class="text-xl font-bold text-slate-800 mb-4">Ranking de Partners</h2>
-        <div class="flex gap-4 overflow-x-auto">
-          <button 
-            v-for="group in groupsWithData" 
-            :key="group.id"
-            @click="activeGroupId = group.id"
-            :class="[
-              'pb-3 px-1 text-sm font-medium border-b-2 whitespace-nowrap transition-colors',
-              activeGroupId === group.id 
-                ? 'border-blue-600 text-blue-600' 
-                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-            ]"
-          >
-            {{ group.label }}
-          </button>
-        </div>
-      </div>
-
-      <!-- TABLA -->
-      <div class="overflow-x-auto max-h-[600px]">
-        <table class="min-w-full text-left text-sm text-slate-600">
-          <thead class="bg-slate-50 text-xs uppercase font-semibold text-slate-500 sticky top-0 shadow-sm z-10">
-            <tr>
-              <th v-for="col in columns" :key="col.key" @click="sortBy(col.key)" class="px-4 py-3 cursor-pointer hover:bg-slate-100 select-none whitespace-nowrap">
-                <div class="flex items-center gap-1">
-                  {{ col.label }}
-                  <span v-if="sortKey === col.key" class="text-peya-red-50 flex items-center">
-                    <svg v-if="sortAsc" class="w-3 h-3 fill-current" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M13.2231 6.81308C13.459 7.04136 13.459 7.41137 13.2231 7.63965C12.9872 7.86803 12.6046 7.86803 12.3686 7.63965L8.81235 4.19761C8.77696 4.16336 8.72447 4.15357 8.67907 4.17273C8.63367 4.1919 8.60417 4.23632 8.60417 4.2855L8.60417 13.4154C8.60417 13.7379 8.33402 14 8.00002 14C7.66603 14 7.39588 13.7379 7.39588 13.4154L7.39588 4.2855C7.39588 4.23632 7.36638 4.1919 7.32098 4.17273C7.27558 4.15357 7.22308 4.16336 7.1877 4.19761L3.63142 7.63965C3.39547 7.86803 3.01287 7.86803 2.77691 7.63965C2.54106 7.41137 2.54106 7.04136 2.77691 6.81308L7.57277 2.17128C7.68083 2.06669 7.82983 2.00147 7.99448 2.00003L7.99949 2L8.00056 2L8.0056 2.00003C8.08533 2.00076 8.16173 2.01646 8.23134 2.0444C8.30263 2.07296 8.36945 2.1153 8.42728 2.17128L13.2231 6.81308Z"/></svg>
-                    <svg v-else class="w-3 h-3 fill-current" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M2.77687 9.18692C2.54101 8.95864 2.54101 8.58863 2.77687 8.36035C3.01282 8.13197 3.39542 8.13197 3.63137 8.36035L7.18765 11.8024C7.22304 11.8366 7.27553 11.8464 7.32093 11.8273C7.36633 11.8081 7.39583 11.7637 7.39583 11.7145L7.39583 2.58457C7.39583 2.26206 7.66598 2 7.99998 2C8.33397 2 8.60412 2.26206 8.60412 2.58457L8.60412 11.7145C8.60412 11.7637 8.63362 11.8081 8.67902 11.8273C8.72442 11.8464 8.77692 11.8366 8.8123 11.8024L12.3686 8.36035C12.6045 8.13197 12.9871 8.13197 13.2231 8.36035C13.4589 8.58863 13.4589 8.95864 13.2231 9.18692L8.42723 13.8287C8.31917 13.9333 8.17017 13.9985 8.00552 14L8.00051 14L7.99944 14L7.9944 14C7.91467 13.9992 7.83827 13.9835 7.76866 13.9556C7.69737 13.927 7.63055 13.8847 7.57272 13.8287L2.77687 9.18692Z"/></svg>
-                  </span>
-                </div>
-              </th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-100">
-            <tr v-for="partner in sortedPartners" :key="partner.vendor_code" class="hover:bg-slate-50 transition-colors">
-              <td class="px-4 py-2 font-medium text-peya-navy-90">{{ partner.vendor_code }}</td>
-              <td class="px-4 py-2 font-medium text-peya-navy-90 truncate max-w-[200px]" :title="partner.partner_name">{{ partner.partner_name }}</td>
-              <td class="px-4 py-2 truncate max-w-[150px]">{{ partner.franchise_name }}</td>
-              <td class="px-4 py-2">
-                <span :class="['px-2 py-1 text-[10px] rounded-full font-medium', partner.is_logistic_marketplace === 'Logistic' ? 'bg-purple-100 text-purple-700' : 'bg-orange-100 text-orange-700']">
-                  {{ partner.is_logistic_marketplace }}
-                </span>
-              </td>
-              <td class="px-4 py-2 text-center">
-                <svg v-if="partner.is_mall" class="w-4 h-4 mx-auto fill-current text-peya-positive" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M10.8152 5.74029C10.5871 5.55592 10.2522 5.59046 10.0669 5.81785L6.99035 9.73215L5.84179 8.50727L5.82882 8.49806C5.58973 8.32827 5.25765 8.38349 5.0869 8.62204C4.91871 8.85702 4.97011 9.18174 5.19964 9.35417L6.75022 10.9059L6.76112 10.9136C6.98975 11.076 7.30572 11.0335 7.48291 10.816L10.8939 6.4862C11.0785 6.25846 11.0432 5.92467 10.8152 5.74029Z"/>
-                  <path fill-rule="evenodd" clip-rule="evenodd" d="M8 1.5C4.41015 1.5 1.5 4.41015 1.5 8C1.5 11.5899 4.41015 14.5 8 14.5C11.5899 14.5 14.5 11.5899 14.5 8C14.5 4.41015 11.5899 1.5 8 1.5ZM2.53497 8C2.53497 4.98175 4.98175 2.53497 8 2.53497C11.0183 2.53497 13.465 4.98175 13.465 8C13.465 11.0183 11.0183 13.465 8 13.465C4.98175 13.465 2.53497 11.0183 2.53497 8Z"/>
-                </svg>
-                <span v-else class="text-peya-navy-60">-</span>
-              </td>
-              <td class="px-4 py-2 text-right">{{ formatNum(partner.total_orders) }}</td>
-              <td class="px-4 py-2 text-right text-red-600">{{ formatNum(partner.rejected_orders) }}</td>
-              <td class="px-4 py-2 text-right font-medium">{{ formatPct(partner.fail_rate) }}</td>
-              <td class="px-4 py-2 text-right">{{ formatPct(partner.open_time_pct) }}</td>
-              <td class="px-4 py-2 text-right text-blue-600 font-medium">{{ formatPct(partner.share_over_group) }}</td>
-              <td class="px-4 py-2 text-right text-emerald-600 font-medium">{{ formatPct(partner.penetracion) }}</td>
-            </tr>
-            <tr v-if="sortedPartners.length === 0">
-              <td colspan="11" class="px-4 py-8 text-center text-slate-400">No hay datos para mostrar en este grupo.</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-    </div>
-  `,
-  setup() {
-    const { computed, ref, watch } = Vue;
-    const storeState = Store.state;
-
-    const activeGroupId = ref(null);
-    const sortKey = ref('total_orders');
-    const sortAsc = ref(false); // Por defecto descendente (los mejores primero)
-
-    const columns = [
-      { key: 'vendor_code', label: 'ID' },
-      { key: 'partner_name', label: 'Nombre' },
-      { key: 'franchise_name', label: 'Franquicia' },
-      { key: 'is_logistic_marketplace', label: 'Operación' },
-      { key: 'is_mall', label: 'Mall' },
-      { key: 'total_orders', label: 'Órdenes' },
-      { key: 'rejected_orders', label: 'Rechazos' },
-      { key: 'fail_rate', label: 'Fail Rate' },
-      { key: 'open_time_pct', label: 'Open Time' },
-      { key: 'share_over_group', label: 'Share (Grupo)' },
-      { key: 'penetracion', label: 'Penetración (Ciudad)' }
-    ];
-
-    const groupsWithData = computed(() => {
-      return storeState.groups.filter(g => g.aggregatedData && g.aggregatedData.partnerTotals.length > 0);
-    });
-
-    // NOTA: asume que Store.html define group.loading (boolean) y group.error
-    // (string|null) por grupo — confirmar contra la versión actual de Store.html.
-    const anyLoading = computed(() => storeState.groups.some(g => g.loading));
-    const anyError = computed(() => {
-      const withError = storeState.groups.find(g => g.error);
-      return withError ? withError.error : null;
-    });
-
-        // Auto-seleccionar la primera pestaña si no hay ninguna activa o si se borra el grupo activo.
-    // Sin deep: groupsWithData ya es un computed reactivo sobre storeState.groups
-    // (Vue trackea sus dependencias finas solo); no hace falta re-trazar cada
-    // campo de cada fila de rawData en cada ciclo.
-    watch(groupsWithData, (newGroups) => {
-      if (newGroups.length > 0 && (!activeGroupId.value || !newGroups.find(g => g.id === activeGroupId.value))) {
-        activeGroupId.value = newGroups[0].id;
-      }
-    }, { immediate: true });
-
-    const activeGroupData = computed(() => {
-      const group = groupsWithData.value.find(g => g.id === activeGroupId.value);
-      return group ? group.aggregatedData.partnerTotals : [];
-    });
-
-    const sortedPartners = computed(() => {
-      let data = [...activeGroupData.value];
-      if (!sortKey.value) return data;
-
-      data.sort((a, b) => {
-        let valA = a[sortKey.value];
-        let valB = b[sortKey.value];
-
-        // Manejar nulos para que siempre queden al final
-        if (valA === null || valA === undefined) valA = sortAsc.value ? Infinity : -Infinity;
-        if (valB === null || valB === undefined) valB = sortAsc.value ? Infinity : -Infinity;
-
-        if (valA < valB) return sortAsc.value ? -1 : 1;
-        if (valA > valB) return sortAsc.value ? 1 : -1;
-        return 0;
-      });
-
-      return data;
-    });
-
-    const sortBy = (key) => {
-      if (sortKey.value === key) {
-        sortAsc.value = !sortAsc.value;
-      } else {
-        sortKey.value = key;
-        sortAsc.value = false; // Al cambiar de columna, ordenar descendente por defecto
-      }
-    };
-
-    const formatNum = (val) => val === null || val === undefined ? '-' : val.toLocaleString('es-CL');
-    const formatPct = (val) => val === null || val === undefined ? '-' : (val * 100).toFixed(2) + '%';
-
-      return {
-      groupsWithData,
-      anyLoading,
-      anyError,
-      activeGroupId,
-      columns,
-      sortedPartners,
-      sortKey,
-      sortAsc,
-      sortBy,
-      formatNum,
-      formatPct
-    };
-  }
-};
-</script>
-```
-
 ## File: Index.html
 ```html
 <!DOCTYPE html>
@@ -1783,4 +1334,458 @@ const UI_Table = {
 
 </body>
 </html>
+```
+
+## File: UI_Charts.html
+```html
+<script>
+const UI_Charts = {
+  template: `
+    <div v-if="hasData" class="w-full max-w-7xl mx-auto bg-peya-white shadow-sm rounded-xl border border-slate-200 p-6 mb-6">
+      
+      <!-- Controles del Gráfico -->
+      <div class="flex flex-col mb-6 border-b border-slate-100 pb-4 gap-4">
+        <div class="flex flex-wrap justify-between items-center w-full">
+          <h2 class="text-xl font-bold text-peya-navy-90">Tendencias Temporales</h2>
+          <div class="flex items-center gap-4">
+            <label class="flex items-center gap-2 cursor-pointer bg-slate-100 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition">
+              <input type="checkbox" v-model="config.showLabels" @change="renderCharts" class="rounded text-peya-red-50 focus:ring-peya-red-50" />
+              <span class="text-sm font-medium text-peya-navy-90">Etiquetas</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer bg-slate-100 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition">
+              <input type="checkbox" v-model="config.merged" @change="renderCharts" class="rounded text-peya-red-50 focus:ring-peya-red-50" />
+              <span class="text-sm font-medium text-peya-navy-90">Fusionar Grupos</span>
+            </label>
+            <button @click="addMetric" class="text-xs bg-transparent border border-peya-navy-60 text-peya-navy-90 hover:bg-slate-100 px-3 py-1.5 rounded-full font-medium transition flex items-center gap-1">
+              <svg class="w-3 h-3 fill-current" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M7.37019 2.73075C7.37019 2.32717 7.69736 2 8.10095 2C8.50453 2 8.8317 2.32717 8.8317 2.73075L8.8317 7.1683L13.2692 7.1683C13.6728 7.1683 14 7.49547 14 7.89906C14 8.30264 13.6728 8.62981 13.2692 8.62981H8.8317L8.8317 13.2692C8.8317 13.6728 8.50453 14 8.10094 14C7.69736 14 7.37019 13.6728 7.37019 13.2692L7.37019 8.62981H2.73075C2.32717 8.62981 2 8.30264 2 7.89906C2 7.49547 2.32717 7.1683 2.73075 7.1683H7.37019L7.37019 2.73075Z"/></svg>
+              Añadir Métrica
+            </button>
+          </div>
+        </div>
+
+        <!-- Lista de métricas configuradas -->
+        <div class="flex flex-wrap gap-3">
+          <div v-for="(cfg, idx) in config.metrics" :key="idx" class="flex items-center gap-2 bg-slate-50 border border-slate-200 p-2 rounded-lg relative pr-8">
+            <button v-if="config.metrics.length > 1" @click="removeMetric(idx)" class="absolute top-2.5 right-2 text-peya-navy-60 hover:text-peya-red-50">
+              <svg class="w-3 h-3 fill-current" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M2.74465 2.73766C3.06852 2.42078 3.59193 2.42078 3.91579 2.73766L8.11718 6.84831L12.0842 2.96695C12.4081 2.65007 12.9315 2.65007 13.2554 2.96695C13.5815 3.2861 13.5815 3.80532 13.2553 4.12448L9.29429 8L13.2553 11.8755C13.5815 12.1947 13.5815 12.7139 13.2553 13.0331C12.9315 13.3499 12.4081 13.3499 12.0842 13.0331L8.11717 9.15169L3.9158 13.2623C3.59193 13.5792 3.06852 13.5792 2.74465 13.2623C2.41845 12.9432 2.41845 12.424 2.74465 12.1048L6.94006 8L2.74465 3.89518C2.41845 3.57603 2.41845 3.05681 2.74465 2.73766Z"/></svg>
+            </button>
+            <select v-model="cfg.id" @change="renderCharts" class="text-xs border-slate-300 rounded shadow-sm focus:ring-peya-red-50 focus:border-peya-red-50">
+              <option value="total_orders">Órdenes Totales</option>
+              <option value="confirmed_orders">Órdenes Confirmadas</option>
+              <option value="rejected_orders">Órdenes Rechazadas</option>
+              <option value="fail_rate">Fail Rate %</option>
+              <option value="city_total_sessions">Sesiones de Ciudad</option>
+              <option value="city_cvr_neto">City CVR Neto</option>
+              <option value="city_cvr_2">City CVR 2</option>
+              <option value="city_cvr_3">City CVR 3</option>
+              <option value="open_time_pct">Cumplimiento Open Time %</option>
+            </select>
+            <select v-model="cfg.type" @change="renderCharts" class="text-xs border-slate-300 rounded shadow-sm focus:ring-peya-red-50 focus:border-peya-red-50">
+              <option value="line">Línea</option>
+              <option value="area">Área</option>
+              <option value="bar">Barra</option>
+            </select>
+            <select v-model="cfg.axis" @change="renderCharts" class="text-xs border-slate-300 rounded shadow-sm focus:ring-peya-red-50 focus:border-peya-red-50">
+              <option value="left">Eje Izq (I)</option>
+              <option value="right">Eje Der (D)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lienzos de Gráficos -->
+      <div v-if="config.merged" id="chart-merged" class="w-full h-96"></div>
+      
+      <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div v-for="group in groupsWithData" :key="group.id" class="border border-slate-100 rounded-lg p-2 bg-slate-50">
+          <h3 class="text-center text-sm font-bold text-peya-navy-70 mb-2">{{ group.label }}</h3>
+          <div :id="'chart-' + group.id" class="w-full h-72"></div>
+        </div>
+      </div>
+
+    </div>
+  `,
+  setup() {
+    const { computed, reactive, watch, nextTick, onUnmounted } = Vue;
+    const storeState = Store.state;
+    let chartInstances = [];
+
+    // Ahora soporta múltiples métricas por defecto
+    const config = reactive({
+      metrics: [{ id: 'total_orders', type: 'bar', axis: 'left' }],
+      merged: false,
+      showLabels: false
+    });
+
+    const addMetric = () => {
+      config.metrics.push({ id: 'fail_rate', type: 'line', axis: 'right' });
+      renderCharts();
+    };
+
+    const removeMetric = (index) => {
+      config.metrics.splice(index, 1);
+      renderCharts();
+    };
+
+    const groupsWithData = computed(() => {
+      return storeState.groups.filter(g => g.aggregatedData && g.aggregatedData.timeSeries.length > 0);
+    });
+
+    const hasData = computed(() => groupsWithData.value.length > 0);
+
+    const formatValue = (val, metric) => {
+      if (['fail_rate', 'open_time_pct', 'city_cvr_neto', 'city_cvr_2', 'city_cvr_3'].includes(metric)) {
+        return (val * 100).toFixed(2) + '%';
+      }
+      return val.toLocaleString('es-CL');
+    };
+
+    // Mapeo corto para ahorrar espacio en las leyendas de ECharts
+    const legendLabels = {
+      total_orders: 'Total Orders',
+      confirmed_orders: 'Confirmed',
+      rejected_orders: 'Rejected',
+      fail_rate: '% FR',
+      city_total_sessions: 'Sessions',
+      city_cvr_neto: '% CVR Neto',
+      city_cvr_2: '% CVR2',
+      city_cvr_3: '% CVR3',
+      open_time_pct: '% OT'
+    };
+
+    const disposeCharts = () => {
+      chartInstances.forEach(instance => instance.dispose());
+      chartInstances = [];
+    };
+
+    const renderCharts = async () => {
+      if (!hasData.value || config.metrics.length === 0) return;
+      
+      await nextTick();
+      // Doble raf (requestAnimationFrame) garantiza que el navegador terminó de pintar los contenedores v-if
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      disposeCharts();
+
+      // Colores corporativos base, expandidos con variaciones tonales coherentes[cite: 10]
+      const peyaColors = [
+        '#EA044E', '#4C4359', '#04ADDF', '#2DE1A0', 
+        '#EC1D60', '#70697A', '#72E6FF', '#F8EA46',
+        '#B40443', '#100423'
+      ];
+
+      // Configuración nativa ECharts para Eje Y Dual
+      const dualYAxis = [
+        { type: 'value', position: 'left' },
+        { type: 'value', position: 'right', splitLine: { show: false } } // Ocultar líneas del eje secundario para evitar ruido
+      ];
+
+      if (config.merged) {
+        // --- MODO FUSIONADO ---
+        const dom = document.getElementById('chart-merged');
+        if (!dom) return;
+        
+        const chart = echarts.init(dom);
+        chartInstances.push(chart);
+
+        const allDates = new Set();
+        groupsWithData.value.forEach(g => {
+          g.aggregatedData.timeSeries.forEach(d => allDates.add(d.fecha));
+        });
+        const xAxisData = Array.from(allDates).sort();
+
+        // En merged mode, las series son: (Grupos * Métricas)
+        let series = [];
+        let colorIdx = 0;
+
+        groupsWithData.value.forEach(g => {
+          const dataMap = new Map(g.aggregatedData.timeSeries.map(d => [d.fecha, d]));
+          
+          config.metrics.forEach(cfg => {
+            series.push({
+              name: `${g.label} - ${legendLabels[cfg.id]}`,
+              type: cfg.type === 'area' ? 'line' : cfg.type,
+              smooth: true,
+              yAxisIndex: cfg.axis === 'right' ? 1 : 0,
+              data: xAxisData.map(fecha => {
+                const row = dataMap.get(fecha);
+                return row ? row[cfg.id] : 0;
+              }),
+              areaStyle: cfg.type === 'area' ? { opacity: 0.1 } : null,
+              label: {
+                show: config.showLabels,
+                position: 'top',
+                formatter: (p) => formatValue(p.value, cfg.id)
+              },
+              itemStyle: { color: peyaColors[colorIdx % peyaColors.length] }
+            });
+            colorIdx++;
+          });
+        });
+
+        chart.setOption({
+          tooltip: { trigger: 'axis' },
+          legend: { top: 'bottom', type: 'scroll' },
+          grid: { left: '3%', right: '4%', bottom: '15%', containLabel: true },
+          xAxis: { type: 'category', data: xAxisData },
+          yAxis: dualYAxis,
+          series: series
+        });
+
+      } else {
+        // --- MODO SEPARADO (SINCRONIZADO) ---
+        groupsWithData.value.forEach((g, index) => {
+          const dom = document.getElementById('chart-' + g.id);
+          if (!dom) return;
+
+          const chart = echarts.init(dom);
+          chartInstances.push(chart);
+
+          const xAxisData = g.aggregatedData.timeSeries.map(d => d.fecha);
+          
+          const series = config.metrics.map((cfg, mIdx) => {
+            const seriesData = g.aggregatedData.timeSeries.map(d => d[cfg.id]);
+            return {
+              name: legendLabels[cfg.id],
+              type: cfg.type === 'area' ? 'line' : cfg.type,
+              smooth: true,
+              yAxisIndex: cfg.axis === 'right' ? 1 : 0,
+              data: seriesData,
+              areaStyle: cfg.type === 'area' ? { opacity: 0.1 } : null,
+              label: {
+                show: config.showLabels,
+                position: 'top',
+                formatter: (p) => formatValue(p.value, cfg.id)
+              },
+              itemStyle: { color: peyaColors[mIdx % peyaColors.length] }
+            };
+          });
+
+          chart.setOption({
+            tooltip: { trigger: 'axis' },
+            legend: { top: 'top', type: 'scroll' },
+            grid: { left: '5%', right: '5%', bottom: '10%', top: '15%', containLabel: true },
+            xAxis: { type: 'category', data: xAxisData },
+            yAxis: dualYAxis,
+            series: series
+          });
+        });
+
+        echarts.connect(chartInstances);
+      }
+    };
+    
+    // Escuchar cambios de versión (Store.state.version se incrementa una vez
+    // por carga de grupo, no por cada campo interno de rawData) — evita un
+    // deep-watch carísimo sobre datasets de miles de filas.
+    // flush: 'post' es obligatorio acá: sin esto, el callback corre ANTES de
+    // que Vue cree los <div id="chart-..."> que aparecen recién cuando
+    // v-if="hasData" pasa a true en el mismo ciclo — document.getElementById
+    // devuelve null y el gráfico queda en blanco hasta el próximo trigger manual.
+    watch(() => storeState.version, () => {
+      renderCharts();
+    }, { flush: 'post' });
+
+    // Limpiar memoria al desmontar
+    onUnmounted(() => disposeCharts());
+
+    return {
+      config,
+      hasData,
+      groupsWithData,
+      addMetric,
+      removeMetric,
+      renderCharts
+    };
+  }
+};
+</script>
+```
+
+## File: UI_Table.html
+```html
+<script>
+/**
+ * Componente Vue: UI_Table
+ * Tabla de ranking a nivel de partner con virtual/sticky scrolling,
+ * pestañas por grupo y ordenamiento dinámico.
+ */
+const UI_Table = {
+  template: `
+    <div class="w-full max-w-7xl mx-auto mb-12">
+        <div v-if="anyLoading" class="w-full bg-white shadow-sm rounded-xl border border-slate-200 p-8 mb-12 text-center text-sm text-slate-400">
+      Cargando ranking de partners…
+    </div>
+      <div v-else-if="anyError" class="w-full bg-white shadow-sm rounded-xl border border-red-200 p-8 mb-12 text-center text-sm text-red-600">
+      {{ anyError }}
+    </div>
+    <div v-else-if="groupsWithData.length > 0" class="w-full bg-white shadow-sm rounded-xl border border-slate-200 overflow-hidden mb-12">
+      
+      <!-- HEADER & TABS -->
+      <div class="px-6 pt-6 border-b border-slate-200">
+        <h2 class="text-xl font-bold text-slate-800 mb-4">Ranking de Partners</h2>
+        <div class="flex gap-4 overflow-x-auto">
+          <button 
+            v-for="group in groupsWithData" 
+            :key="group.id"
+            @click="activeGroupId = group.id"
+            :class="[
+              'pb-3 px-1 text-sm font-medium border-b-2 whitespace-nowrap transition-colors',
+              activeGroupId === group.id 
+                ? 'border-blue-600 text-blue-600' 
+                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+            ]"
+          >
+            {{ group.label }}
+          </button>
+        </div>
+      </div>
+
+      <!-- TABLA -->
+      <div class="overflow-x-auto max-h-[600px]">
+        <table class="min-w-full text-left text-sm text-slate-600">
+          <thead class="bg-slate-50 text-xs uppercase font-semibold text-slate-500 sticky top-0 shadow-sm z-10">
+            <tr>
+              <th v-for="col in columns" :key="col.key" @click="sortBy(col.key)" class="px-4 py-3 cursor-pointer hover:bg-slate-100 select-none whitespace-nowrap">
+                <div class="flex items-center gap-1">
+                  {{ col.label }}
+                  <span v-if="sortKey === col.key" class="text-peya-red-50 flex items-center">
+                    <svg v-if="sortAsc" class="w-3 h-3 fill-current" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M13.2231 6.81308C13.459 7.04136 13.459 7.41137 13.2231 7.63965C12.9872 7.86803 12.6046 7.86803 12.3686 7.63965L8.81235 4.19761C8.77696 4.16336 8.72447 4.15357 8.67907 4.17273C8.63367 4.1919 8.60417 4.23632 8.60417 4.2855L8.60417 13.4154C8.60417 13.7379 8.33402 14 8.00002 14C7.66603 14 7.39588 13.7379 7.39588 13.4154L7.39588 4.2855C7.39588 4.23632 7.36638 4.1919 7.32098 4.17273C7.27558 4.15357 7.22308 4.16336 7.1877 4.19761L3.63142 7.63965C3.39547 7.86803 3.01287 7.86803 2.77691 7.63965C2.54106 7.41137 2.54106 7.04136 2.77691 6.81308L7.57277 2.17128C7.68083 2.06669 7.82983 2.00147 7.99448 2.00003L7.99949 2L8.00056 2L8.0056 2.00003C8.08533 2.00076 8.16173 2.01646 8.23134 2.0444C8.30263 2.07296 8.36945 2.1153 8.42728 2.17128L13.2231 6.81308Z"/></svg>
+                    <svg v-else class="w-3 h-3 fill-current" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M2.77687 9.18692C2.54101 8.95864 2.54101 8.58863 2.77687 8.36035C3.01282 8.13197 3.39542 8.13197 3.63137 8.36035L7.18765 11.8024C7.22304 11.8366 7.27553 11.8464 7.32093 11.8273C7.36633 11.8081 7.39583 11.7637 7.39583 11.7145L7.39583 2.58457C7.39583 2.26206 7.66598 2 7.99998 2C8.33397 2 8.60412 2.26206 8.60412 2.58457L8.60412 11.7145C8.60412 11.7637 8.63362 11.8081 8.67902 11.8273C8.72442 11.8464 8.77692 11.8366 8.8123 11.8024L12.3686 8.36035C12.6045 8.13197 12.9871 8.13197 13.2231 8.36035C13.4589 8.58863 13.4589 8.95864 13.2231 9.18692L8.42723 13.8287C8.31917 13.9333 8.17017 13.9985 8.00552 14L8.00051 14L7.99944 14L7.9944 14C7.91467 13.9992 7.83827 13.9835 7.76866 13.9556C7.69737 13.927 7.63055 13.8847 7.57272 13.8287L2.77687 9.18692Z"/></svg>
+                  </span>
+                </div>
+              </th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            <tr v-for="partner in sortedPartners" :key="partner.vendor_code" class="hover:bg-slate-50 transition-colors">
+              <td class="px-4 py-2 font-medium text-peya-navy-90">{{ partner.vendor_code }}</td>
+              <td class="px-4 py-2 font-medium text-peya-navy-90 truncate max-w-[200px]" :title="partner.partner_name">{{ partner.partner_name }}</td>
+              <td class="px-4 py-2 truncate max-w-[150px]">{{ partner.franchise_name }}</td>
+              <td class="px-4 py-2">
+                <span :class="['px-2 py-1 text-[10px] rounded-full font-medium', partner.is_logistic_marketplace === 'Logistic' ? 'bg-purple-100 text-purple-700' : 'bg-orange-100 text-orange-700']">
+                  {{ partner.is_logistic_marketplace }}
+                </span>
+              </td>
+              <td class="px-4 py-2 text-center">
+                <svg v-if="partner.is_mall" class="w-4 h-4 mx-auto fill-current text-peya-positive" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M10.8152 5.74029C10.5871 5.55592 10.2522 5.59046 10.0669 5.81785L6.99035 9.73215L5.84179 8.50727L5.82882 8.49806C5.58973 8.32827 5.25765 8.38349 5.0869 8.62204C4.91871 8.85702 4.97011 9.18174 5.19964 9.35417L6.75022 10.9059L6.76112 10.9136C6.98975 11.076 7.30572 11.0335 7.48291 10.816L10.8939 6.4862C11.0785 6.25846 11.0432 5.92467 10.8152 5.74029Z"/>
+                  <path fill-rule="evenodd" clip-rule="evenodd" d="M8 1.5C4.41015 1.5 1.5 4.41015 1.5 8C1.5 11.5899 4.41015 14.5 8 14.5C11.5899 14.5 14.5 11.5899 14.5 8C14.5 4.41015 11.5899 1.5 8 1.5ZM2.53497 8C2.53497 4.98175 4.98175 2.53497 8 2.53497C11.0183 2.53497 13.465 4.98175 13.465 8C13.465 11.0183 11.0183 13.465 8 13.465C4.98175 13.465 2.53497 11.0183 2.53497 8Z"/>
+                </svg>
+                <span v-else class="text-peya-navy-60">-</span>
+              </td>
+              <td class="px-4 py-2 text-right">{{ formatNum(partner.total_orders) }}</td>
+              <td class="px-4 py-2 text-right text-red-600">{{ formatNum(partner.rejected_orders) }}</td>
+              <td class="px-4 py-2 text-right font-medium">{{ formatPct(partner.fail_rate) }}</td>
+              <td class="px-4 py-2 text-right">{{ formatPct(partner.open_time_pct) }}</td>
+              <td class="px-4 py-2 text-right text-blue-600 font-medium">{{ formatPct(partner.share_over_group) }}</td>
+              <td class="px-4 py-2 text-right text-emerald-600 font-medium">{{ formatPct(partner.penetracion) }}</td>
+            </tr>
+            <tr v-if="sortedPartners.length === 0">
+              <td colspan="11" class="px-4 py-8 text-center text-slate-400">No hay datos para mostrar en este grupo.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+    </div>
+  `,
+  setup() {
+    const { computed, ref, watch } = Vue;
+    const storeState = Store.state;
+
+    const activeGroupId = ref(null);
+    const sortKey = ref('total_orders');
+    const sortAsc = ref(false); // Por defecto descendente (los mejores primero)
+
+    const columns = [
+      { key: 'vendor_code', label: 'ID' },
+      { key: 'partner_name', label: 'Nombre' },
+      { key: 'franchise_name', label: 'Franquicia' },
+      { key: 'is_logistic_marketplace', label: 'Operación' },
+      { key: 'is_mall', label: 'Mall' },
+      { key: 'total_orders', label: 'Órdenes' },
+      { key: 'rejected_orders', label: 'Rechazos' },
+      { key: 'fail_rate', label: 'Fail Rate' },
+      { key: 'open_time_pct', label: 'Open Time' },
+      { key: 'share_over_group', label: 'Share (Grupo)' },
+      { key: 'penetracion', label: 'Penetración (Ciudad)' }
+    ];
+
+    const anyLoading = computed(() => storeState.groups.some(g => g.loading));
+    const anyError = computed(() => {
+      const withError = storeState.groups.find(g => g.error);
+      return withError ? withError.error : null;
+    });
+
+    // Variables locales (refs) para evadir los fallos de Proxy caching de Vue 3
+    const groupsWithData = ref([]);
+    const activeGroupData = ref([]);
+
+    // Sincronización manual infalible
+    const syncTableData = () => {
+      groupsWithData.value = storeState.groups.filter(g => 
+        g.aggregatedData && g.aggregatedData.partnerTotals && g.aggregatedData.partnerTotals.length > 0
+      );
+
+      if (groupsWithData.value.length > 0 && (!activeGroupId.value || !groupsWithData.value.find(g => g.id === activeGroupId.value))) {
+        activeGroupId.value = groupsWithData.value[0].id;
+      }
+
+      const group = groupsWithData.value.find(g => g.id === activeGroupId.value);
+      activeGroupData.value = group ? group.aggregatedData.partnerTotals : [];
+    };
+
+    // Forzar actualización solo ante la señal global (version) o al cambiar de pestaña
+    watch(() => storeState.version, syncTableData, { immediate: true });
+    watch(activeGroupId, syncTableData);
+
+    const sortedPartners = computed(() => {
+      let data = [...activeGroupData.value];
+      if (!sortKey.value) return data;
+
+      data.sort((a, b) => {
+        let valA = a[sortKey.value];
+        let valB = b[sortKey.value];
+
+        // Manejar nulos para que siempre queden al final
+        if (valA === null || valA === undefined) valA = sortAsc.value ? Infinity : -Infinity;
+        if (valB === null || valB === undefined) valB = sortAsc.value ? Infinity : -Infinity;
+
+        if (valA < valB) return sortAsc.value ? -1 : 1;
+        if (valA > valB) return sortAsc.value ? 1 : -1;
+        return 0;
+      });
+
+      return data;
+    });
+
+    const sortBy = (key) => {
+      if (sortKey.value === key) {
+        sortAsc.value = !sortAsc.value;
+      } else {
+        sortKey.value = key;
+        sortAsc.value = false; // Al cambiar de columna, ordenar descendente por defecto
+      }
+    };
+
+    const formatNum = (val) => val === null || val === undefined ? '-' : val.toLocaleString('es-CL');
+    const formatPct = (val) => val === null || val === undefined ? '-' : (val * 100).toFixed(2) + '%';
+
+      return {
+      groupsWithData,
+      anyLoading,
+      anyError,
+      activeGroupId,
+      columns,
+      sortedPartners,
+      sortKey,
+      sortAsc,
+      sortBy,
+      formatNum,
+      formatPct
+    };
+  }
+};
+</script>
 ```

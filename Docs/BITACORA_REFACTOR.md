@@ -66,7 +66,7 @@ Copia esta plantilla al inicio del archivo (justo debajo de este bloque de instr
 - **Objetivo de la sesión:** Integrar la interfaz gráfica con el backend de BigQuery, resolver errores de permisos y diagnosticar fallos silenciosos en la entrega masiva de datos para lograr una versión de producción estable.
 
 ### Archivos creados/modificados
-- `Config.gs` — Modificado para corregir el `PROJECT_ID` de ejecución apuntando a `peya-data-origins-pro`, resolviendo el error 403 (Access Denied).
+- `Config.gs` — Modificado para corregir el `PROJECT_ID` de ejecución apuntando a `peya-chile`, resolviendo el error 403 (Access Denied).
 - `Service_BigQuery.gs` — Refactorizado profundamente. Se reemplazó el paso de parámetros nulos por **SQL dinámico**. La cláusula `WHERE` ahora se ensambla condicionalmente para evitar el bug de la API de BigQuery donde `ARRAY_LENGTH(NULL)` elimina todas las filas de la tabla de forma silenciosa.
 - `Controller.gs` — Modificada la función `fetchDashboardData` para envolver la respuesta en `JSON.stringify(rawData)`. Esto actúa como un mecanismo de compresión para eludir el límite de ~15MB de `google.script.run`.
 - `UI_Filters.html` — Actualizada la promesa `withSuccessHandler` para incluir `JSON.parse()`, revirtiendo la compresión del backend exitosamente sin colapsar la memoria del navegador.
@@ -114,3 +114,29 @@ Copia esta plantilla al inicio del archivo (justo debajo de este bloque de instr
 
 ### Criterio de éxito de la subfase
 - [X] No cumplido — la tabla de partners sigue sin aparecer. Se corrigió (no se dejó pendiente) la regresión de renderizado de gráficos introducida por este mismo intento.
+
+---
+
+## [Fecha: 2026-09-04] — Fix #1 Parte 2: Depuración Empírica de Vue 3 (Gráficos OK, Tabla Pendiente)
+
+- **Hora de inicio – Hora de cierre:** 22:45 – 23:45
+- **Duración total:** 1 hora
+- **Fase / Subfase relacionada:** REFACTOR_PLAN.md — Fix #1 (Tabla de Partners desaparecida / Fragmentos Raíz en Vue 3)
+- **Objetivo de la sesión:** Ejecutar diagnóstico empírico en la consola de Chrome para aislar el fallo de reactividad en `UI_Table.html` que mantenía la tabla oculta tras la optimización de memoria.
+
+### Archivos creados/modificados
+- `UI_Charts.html` — Se implementó un bypass de renderizado usando doble `requestAnimationFrame` antes de inicializar ECharts. **(Éxito: Los gráficos ahora se dibujan automáticamente sin intervención manual)**.
+- `UI_Table.html` — Se intentaron múltiples enfoques para forzar la reactividad perdida tras aplicar `Vue.markRaw()` en el Store:
+  1. Inyección explícita de `storeState.version` dentro de `computed`.
+  2. Sustitución de variables `computed` por estado manual `ref([])` sincronizado por eventos.
+  3. Adición de un contenedor `<div class="w-full">` como nodo raíz absoluto para evitar un bug de compilación de Fragmentos Raíz (`v-if / v-else-if` paralelos) en la versión CDN de Vue 3.
+
+### Decisiones tomadas
+- **Aislamiento del Fallo (Descarte de Backend/BQ):** Mediante pruebas en el contexto de ejecución `userCodeAppPanel` de las DevTools, se demostró irrefutablemente que los datos de BigQuery llegan y se procesan matemáticamente de forma correcta (`partnerTotals: 32` y `partnerTotals: 81` detectados en memoria). El backend, las queries y el `Store.html` funcionan perfectamente.
+- **Bug Silencioso de Frontend:** Se determinó que el problema reside exclusivamente en un fallo silencioso del compilador nativo de Vue 3 (vía CDN). Pese a que el arreglo `tableGroups` tiene datos y el HTML posee las instrucciones para iterarlos, el DOM no refleja los cambios, no arrojando excepciones ni errores de JavaScript.
+
+### Pendientes para la próxima sesión
+- **Fix #1 (Tabla de Partners):** El problema persiste. Se requiere investigar alternativas para forzar a Vue 3 a redibujar el nodo o considerar rediseñar el componente `UI_Table.html` desde cero evadiendo patrones de anidación condicional profunda.
+
+### Criterio de éxito de la subfase
+- [X] No cumplido — La tabla de partners sigue siendo invisible en el DOM a pesar de contar con los datos en memoria. Se logró resolver exitosamente la auto-carga de los gráficos.
