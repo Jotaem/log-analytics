@@ -232,10 +232,16 @@ const UI_Charts = {
       }
     };
     
-    // Escuchar si llegan datos nuevos al store
-    watch(() => storeState.groups, () => {
+    // Escuchar cambios de versión (Store.state.version se incrementa una vez
+    // por carga de grupo, no por cada campo interno de rawData) — evita un
+    // deep-watch carísimo sobre datasets de miles de filas.
+    // flush: 'post' es obligatorio acá: sin esto, el callback corre ANTES de
+    // que Vue cree los <div id="chart-..."> que aparecen recién cuando
+    // v-if="hasData" pasa a true en el mismo ciclo — document.getElementById
+    // devuelve null y el gráfico queda en blanco hasta el próximo trigger manual.
+    watch(() => storeState.version, () => {
       renderCharts();
-    }, { deep: true });
+    }, { flush: 'post' });
 
     // Limpiar memoria al desmontar
     onUnmounted(() => disposeCharts());

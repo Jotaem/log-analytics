@@ -6,7 +6,13 @@
  */
 const UI_Table = {
   template: `
-    <div v-if="groupsWithData.length > 0" class="w-full max-w-7xl mx-auto bg-white shadow-sm rounded-xl border border-slate-200 overflow-hidden mb-12">
+        <div v-if="anyLoading" class="w-full max-w-7xl mx-auto bg-white shadow-sm rounded-xl border border-slate-200 p-8 mb-12 text-center text-sm text-slate-400">
+      Cargando ranking de partners…
+    </div>
+    <div v-else-if="anyError" class="w-full max-w-7xl mx-auto bg-white shadow-sm rounded-xl border border-red-200 p-8 mb-12 text-center text-sm text-red-600">
+      {{ anyError }}
+    </div>
+    <div v-else-if="groupsWithData.length > 0" class="w-full max-w-7xl mx-auto bg-white shadow-sm rounded-xl border border-slate-200 overflow-hidden mb-12">
       
       <!-- HEADER & TABS -->
       <div class="px-6 pt-6 border-b border-slate-200">
@@ -103,12 +109,23 @@ const UI_Table = {
       return storeState.groups.filter(g => g.aggregatedData && g.aggregatedData.partnerTotals.length > 0);
     });
 
-    // Auto-seleccionar la primera pestaña si no hay ninguna activa o si se borra el grupo activo
+    // NOTA: asume que Store.html define group.loading (boolean) y group.error
+    // (string|null) por grupo — confirmar contra la versión actual de Store.html.
+    const anyLoading = computed(() => storeState.groups.some(g => g.loading));
+    const anyError = computed(() => {
+      const withError = storeState.groups.find(g => g.error);
+      return withError ? withError.error : null;
+    });
+
+        // Auto-seleccionar la primera pestaña si no hay ninguna activa o si se borra el grupo activo.
+    // Sin deep: groupsWithData ya es un computed reactivo sobre storeState.groups
+    // (Vue trackea sus dependencias finas solo); no hace falta re-trazar cada
+    // campo de cada fila de rawData en cada ciclo.
     watch(groupsWithData, (newGroups) => {
       if (newGroups.length > 0 && (!activeGroupId.value || !newGroups.find(g => g.id === activeGroupId.value))) {
         activeGroupId.value = newGroups[0].id;
       }
-    }, { immediate: true, deep: true });
+    }, { immediate: true });
 
     const activeGroupData = computed(() => {
       const group = groupsWithData.value.find(g => g.id === activeGroupId.value);
@@ -147,8 +164,10 @@ const UI_Table = {
     const formatNum = (val) => val === null || val === undefined ? '-' : val.toLocaleString('es-CL');
     const formatPct = (val) => val === null || val === undefined ? '-' : (val * 100).toFixed(2) + '%';
 
-    return {
+      return {
       groupsWithData,
+      anyLoading,
+      anyError,
       activeGroupId,
       columns,
       sortedPartners,

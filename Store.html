@@ -23,8 +23,14 @@ const Store = (function () {
   // Cada grupo: { id, filtrosLocales, rangoTemporal, rawData, aggregatedData }
   // rawData: array de objetos tal como llega de Controller.fetchDashboardData
   // aggregatedData: { timeSeries, partnerTotals, dedupedTotalSessions } — ver aggregateGroup()
-  const state = reactive({
-    groups: []
+    const state = reactive({
+    groups: [],
+    // Se incrementa una sola vez por carga completa de grupo (ver
+    // setGroupRawData). UI_Charts.html y UI_Table.html vigilan esto en vez
+    // de hacer watch({deep:true}) sobre storeState.groups — evita que Vue
+    // tenga que recorrer recursivamente miles de filas de rawData en cada
+    // ciclo reactivo.
+    version: 0
   });
 
   // ---------------------------------------------------------------------
@@ -210,11 +216,18 @@ const Store = (function () {
    * A partir de acá, cualquier cambio de eje/tipo de gráfico/granularidad
    * en la UI relee aggregatedData sin volver a llamar al servidor.
    */
-  function setGroupRawData(groupId, rawData) {
+    function setGroupRawData(groupId, rawData) {
     const group = getGroup(groupId);
     if (!group) throw new Error('Grupo no encontrado: ' + groupId);
-    group.rawData = rawData;
+    // markRaw: le dice a Vue que NO convierta este array en reactivo fila
+    // por fila. Sigue siendo un array JS normal (se lee/filtra igual en
+    // aggregateGroup, en UI_Table.html, etc.), pero Vue deja de tener que
+    // proxyar recursivamente cada una de sus filas al asignarlo dentro de
+    // un objeto ya reactivo (group). Nadie necesita reactividad campo por
+    // campo sobre el dataset crudo — solo aggregatedData, que sí es chico.
+    group.rawData = Vue.markRaw(rawData);
     group.aggregatedData = aggregateGroup(rawData);
+    state.version++;
   }
 
   // ---------------------------------------------------------------------
