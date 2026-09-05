@@ -122,6 +122,8 @@ const UI_Charts = {
       if (!hasData.value || config.metrics.length === 0) return;
       
       await nextTick();
+      // Doble raf (requestAnimationFrame) garantiza que el navegador terminó de pintar los contenedores v-if
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       disposeCharts();
 
       // Colores corporativos base, expandidos con variaciones tonales coherentes[cite: 10]
