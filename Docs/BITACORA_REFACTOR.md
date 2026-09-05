@@ -33,6 +33,51 @@ Copia esta plantilla al inicio del archivo (justo debajo de este bloque de instr
 
 ## Entradas
 
+## [Fecha: 2026-09-05] — Fix #1 Parte 3: Renderizado DOM lateral para tabla de Partners
+
+- **Hora de inicio – Hora de cierre:** [no registrada] – 00:10
+- **Duración total:** [no registrada]
+- **Fase / Subfase relacionada:** REFACTOR_PLAN.md — Fix #1 (Tabla de Partners desaparecida)
+- **Objetivo de la sesión:** Evitar el colapso silencioso del compilador Vue 3 CDN en la tabla sin agregar consultas al backend ni duplicar la lógica matemática.
+
+### Archivos creados/modificados
+- `UI_Table.html` — Se reemplazó el árbol dinámico de `v-if`/`v-for` por un único shell Vue estable (`ref="tableRoot"`) y un renderer DOM local que reconstruye la tabla al cambiar `Store.state.version`, la pestaña o el ordenamiento.
+- `BITACORA_REFACTOR.md` — Se documenta el enfoque lateral y sus límites de validación.
+
+### Decisiones tomadas
+- Se conserva `Store.state.version` como única señal de carga; `rawData`, agregaciones y cálculos siguen exclusivamente en `Store.html`.
+- Se mantiene el filtrado y ordenamiento en memoria; no se agrega ninguna llamada `google.script.run`, GAS ni BigQuery.
+- Se elimina la dependencia del compilador Vue para iterar grupos, encabezados y filas, manteniendo el contrato global `UI_Table` y sus controles de pestaña/ordenamiento mediante delegación de eventos.
+
+### Pendientes para la próxima sesión
+- Probar el deployment `/dev` o una nueva versión en el navegador y confirmar visualmente que la tabla aparece con los grupos reales.
+- Ejecutar en consola la inspección de `Store.state.groups` ya documentada en la entrada anterior si el deployment no refleja el cambio.
+
+### Criterio de éxito de la subfase
+- [x] Cumplido — La tabla se confirmó operativa en el deployment; el archivo pasa validación sintáctica, `get_errors` y `git diff --check`.
+
+## [Fecha: 2026-09-05] — Fix #2: Filtro de fecha en Tabla de Partners
+
+- **Hora de inicio – Hora de cierre:** [no registrada] – [no registrada]
+- **Duración total:** [no registrada]
+- **Fase / Subfase relacionada:** REFACTOR_PLAN.md — Fix #2 (Filtro de fecha en la Tabla de Partners)
+- **Objetivo de la sesión:** Permitir analizar el ranking de partners sobre una selección de fechas del cohorte activo, sin nuevas consultas al backend y manteniendo la integridad de las métricas.
+
+### Archivos creados/modificados
+- `UI_Table.html` — Se añadió un dropdown client-side con checkbox por cada fecha disponible en `aggregatedData.timeSeries`. La selección se conserva por grupo y, cuando es parcial, recalcula `partnerTotals` con `Store.aggregateGroup()` sobre las filas correspondientes de `rawData`.
+
+### Decisiones tomadas
+- La opción "Todas" usa el `partnerTotals` cacheado del grupo; no se recalcula innecesariamente.
+- Una selección parcial recalcula Fail Rate, Open Time, Share y Penetración desde las filas crudas filtradas, respetando las funciones matemáticas existentes de `Store.html`.
+- El filtro es exclusivo de la tabla: no altera `rawData`, `aggregatedData` ni los gráficos y no ejecuta `google.script.run`.
+
+### Pendientes para la próxima sesión
+- Validar visualmente con un cohorte real: deseleccionar aproximadamente la mitad de las fechas y contrastar las métricas contra un cálculo manual.
+- Confirmar que la selección de fechas se conserva al cambiar de pestaña y se reinicia solo cuando una carga nueva deja de contener esas fechas.
+
+### Criterio de éxito de la subfase
+- [ ] Pendiente de validación visual y matemática con datos reales — Implementación y validaciones sintácticas completadas.
+
 ## [Fecha: 2026-09-02] — Refactor UI, Design System y Herramientas Analíticas IA
 
 - **Hora de inicio – Hora de cierre:** 16:30 – 20:15
