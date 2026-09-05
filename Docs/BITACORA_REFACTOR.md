@@ -78,6 +78,82 @@ Copia esta plantilla al inicio del archivo (justo debajo de este bloque de instr
 ### Criterio de éxito de la subfase
 - [ ] Pendiente de validación visual y matemática con datos reales — Implementación y validaciones sintácticas completadas.
 
+## [Fecha: 2026-09-05] — Fix #3: Cruce de ciudades Perseus, logística y sesiones
+
+- **Hora de inicio – Hora de cierre:** [no registrada] – [no registrada]
+- **Duración total:** [no registrada]
+- **Fase / Subfase relacionada:** REFACTOR_PLAN.md — Fix #3 (Fechas con 0 pedidos: ciudad logística y sesiones)
+- **Objetivo de la sesión:** Mantener la ciudad logística en días sin órdenes y recuperar el cruce correcto de sesiones sin agregar consultas ni cambiar el contrato del backend.
+
+### Archivos creados/modificados
+- `Service_BigQuery.gs` — Se agregó el CTE `city_log_map` con el cruce Perseus→ciudad logística documentado; `base_partners` usa ese mapa como fallback cuando no existe una fila logística por ausencia de órdenes; `dataset` une `base_sessions` por `p.ciudad` y fecha.
+
+### Decisiones tomadas
+- Las sesiones se comparan ciudad Perseus contra ciudad Perseus (`p.ciudad = s.ciudad`), no zona operativa contra ciudad.
+- `zone_name_log` conserva `Sin Zona Logística` cuando no hay orden logística, porque el mapa disponible solo define ciudad→ciudad logística y no ciudad→zona.
+- Se mantienen los filtros y parámetros nombrados existentes; no se concatena ningún valor de usuario en SQL.
+
+### Pendientes para la próxima sesión
+- Ejecutar una consulta real con un partner y fecha de 0 órdenes para confirmar `city_name_log` mapeado y sesiones mayores que cero cuando exista tráfico.
+- Validar una fecha con órdenes para confirmar que el cruce de sesiones no regresiona y que la ciudad logística proveniente de `base_logistics` sigue teniendo prioridad.
+
+### Criterio de éxito de la subfase
+- [x] Cumplido funcionalmente — Las fechas sin órdenes pueden llegar al dataset y mostrarse; queda una validación de datos pendiente sobre Sesiones y CVR.
+
+### Seguimiento de diagnóstico
+- La primera implementación del diccionario no podía crear fechas: el problema estaba antes, en `base_partners`, donde `hp.is_active = TRUE` eliminaba las filas históricas de ciudades cerradas.
+- La query conserva ahora los snapshots de `historical_partners` dentro de `@from_date`/`@to_date`; `is_active_partner`, `schedule_open_time` y las órdenes quedan como métricas, no como condición de existencia.
+- Prueba requerida: correr una query local sobre el dataset devuelto para verificar cómo regresan Sesiones y CVR en un 18/19 de septiembre o 1 de enero con cero órdenes.
+- Observación: existen dudas abiertas sobre si el dato de Sesiones y CVR está siendo calculado por la query o interpretado por el dashboard con una granularidad distinta a la del dashboard gerencial.
+
+## [Fecha: 2026-09-05] — Validación de sesiones y formato de métricas
+
+- **Hora de inicio – Hora de cierre:** [no registrada] – [no registrada]
+- **Duración total:** [no registrada]
+- **Fase / Subfase relacionada:** REFACTOR_PLAN.md — Fix #3 y calidad de visualización
+- **Objetivo de la sesión:** Confirmar la deduplicación de sesiones repetidas por partner y uniformar la presentación de números y porcentajes en gráficos y tabla.
+
+### Archivos creados/modificados
+- `Store.html` — Se normalizó la llave de deduplicación a ciudad+fecha ignorando espacios y mayúsculas; las filas repetidas siguen sin sumarse y ahora se advierten conflictos cuando contienen valores de sesión distintos.
+- `UI_Charts.html` — Etiquetas y tooltips muestran números con un decimal máximo y porcentajes multiplicados por 100 con sufijo `%`, tanto en modo separado como fusionado.
+- `UI_Table.html` — Números y porcentajes se muestran con un decimal.
+- `BITACORA_REFACTOR.md` — Se documenta el diagnóstico y la corrección visual.
+
+### Decisiones tomadas
+- No se cambió la regla de negocio de sesiones: una observación por `ciudad|fecha`; no se suman filas de partners.
+- Un conflicto de valores para la misma ciudad y fecha no se resuelve silenciosamente: se conserva la primera fila y se registra un `console.warn` con ambas observaciones para contrastarlo contra BigQuery y el dashboard gerencial.
+- El valor `7607` debe investigarse primero en el resultado crudo de `base_sessions`; si no hay conflicto en el warning, la diferencia está aguas arriba o en la definición de la métrica, no en la suma de partners del frontend.
+
+### Pendientes para la próxima sesión
+- Revisar el warning de sesiones y comparar el valor crudo de `base_sessions` para la ciudad y fechas observadas.
+- Confirmar si el dashboard gerencial aplica filtros adicionales de país, área o definición de sesión antes de comparar cifras.
+
+### Criterio de éxito de la subfase
+- [ ] Pendiente de validación de datos — La deduplicación y el formato pasan validaciones locales; falta reconciliar `7607/188` contra `236/228` con el resultado real de BigQuery.
+
+## [Fecha: 2026-09-05] — Fix #4: Breakdown Mall/No Mall y Logistic/Marketplace
+
+- **Hora de inicio – Hora de cierre:** [no registrada] – [no registrada]
+- **Duración total:** [no registrada]
+- **Fase / Subfase relacionada:** REFACTOR_PLAN.md — Fix #4 (Breakdown por Mall / Logistic en gráficos)
+- **Objetivo de la sesión:** Habilitar la partición client-side de los gráficos por Mall/No Mall o Logistic/Marketplace, en valores absolutos o Share porcentual.
+
+### Archivos creados/modificados
+- `Store.html` — Se agregó `aggregateGroupByBreakdown()`, que particiona el dataset en memoria y reutiliza `aggregateGroup()` para ratios y sesiones.
+- `UI_Charts.html` — Se agregaron los selectores de breakdown y Share (%), series separadas por dimensión y alineación por fecha del eje X.
+
+### Decisiones tomadas
+- El breakdown no realiza llamadas a GAS ni BigQuery; trabaja sobre `group.rawData` ya cargado.
+- Fail Rate y demás ratios se calculan dentro de cada partición mediante las funciones existentes; no se promedian porcentajes.
+- Share (%) se normaliza contra la métrica total del grupo en la misma fecha.
+
+### Pendientes para la próxima sesión
+- Probar en deployment con un grupo que mezcle Mall/No Mall y verificar que las series aparecen correctamente.
+- Validar que la suma ponderada de Fail Rate por órdenes coincide con el Fail Rate del grupo completo.
+
+### Criterio de éxito de la subfase
+- [ ] Pendiente de validación visual y matemática real — Implementación, sintaxis y diagnósticos locales completados.
+
 ## [Fecha: 2026-09-02] — Refactor UI, Design System y Herramientas Analíticas IA
 
 - **Hora de inicio – Hora de cierre:** 16:30 – 20:15

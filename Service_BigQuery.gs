@@ -164,6 +164,87 @@ function buildMasterQuery_(filters) {
       ${_getMallsPolygonsCte_()}
     ),
 
+    city_log_map AS (
+      SELECT ciudad_perseus, ANY_VALUE(city_name_log) AS city_name_log
+      FROM UNNEST([
+        STRUCT('Antofagasta' AS ciudad_perseus, 'Antofagasta' AS city_name_log),
+        STRUCT('Arica', 'Arica'),
+        STRUCT('Buin', 'Buin'),
+        STRUCT('Linderos', 'Buin'),
+        STRUCT('Calama', 'Calama'),
+        STRUCT('Castro', 'Castro'),
+        STRUCT('Chillán', 'Chillan'),
+        STRUCT('Batuco', 'Colina'),
+        STRUCT('Gran Concepción', 'Concepcion'),
+        STRUCT('Copiapó', 'Copiapo'),
+        STRUCT('Coyhaique', 'Coyhaique'),
+        STRUCT('Curicó', 'Curico'),
+        STRUCT('Iquique', 'Iquique'),
+        STRUCT('Coquimbo', 'La serena'),
+        STRUCT('La Serena', 'La serena'),
+        STRUCT('Olmué', 'Limache'),
+        STRUCT('Linares', 'Linares'),
+        STRUCT('Los Ángeles', 'Los angeles'),
+        STRUCT('Maitencillo', 'Maitencillo'),
+        STRUCT('Zapallar', 'Maitencillo'),
+        STRUCT('Melipilla', 'Melipilla'),
+        STRUCT('Osorno', 'Osorno'),
+        STRUCT('Ovalle', 'Ovalle'),
+        STRUCT('Peñaflor', 'Penaflor'),
+        STRUCT('Talagante', 'Penaflor'),
+        STRUCT('Pucón', 'Pucon'),
+        STRUCT('Pucon', 'Pucon'),
+        STRUCT('Puerto Montt', 'Puerto montt'),
+        STRUCT('Puerto Varas', 'Puerto varas'),
+        STRUCT('Punta Arenas', 'Punta arenas'),
+        STRUCT('Hijuelas', 'Quillota'),
+        STRUCT('La Calera', 'Quillota'),
+        STRUCT('Quillota', 'Quillota'),
+        STRUCT('Rancagua', 'Rancagua'),
+        STRUCT('Santo Domingo Oeste', 'San antonio'),
+        STRUCT('San Antonio', 'San antonio'),
+        STRUCT('Santo Domingo', 'San antonio'),
+        STRUCT('Los Andes', 'San felipe  los andes'),
+        STRUCT('San Felipe', 'San felipe  los andes'),
+        STRUCT('San Fernando', 'San fernando'),
+        STRUCT('Santa Cruz', 'Santa cruz'),
+        STRUCT('Colina', 'Santiago'),
+        STRUCT('Algarrobo', 'Sin Zona Logística'),
+        STRUCT('El Quisco', 'Sin Zona Logística'),
+        STRUCT('Frutillar', 'Sin Zona Logística'),
+        STRUCT('Illapel', 'Sin Zona Logística'),
+        STRUCT('La Ligua', 'Sin Zona Logística'),
+        STRUCT('Nacimiento', 'Sin Zona Logística'),
+        STRUCT('Pichilemu', 'Sin Zona Logística'),
+        STRUCT('Quintero', 'Sin Zona Logística'),
+        STRUCT('Santiago', 'Santiago'),
+        STRUCT('Talca', 'Talca'),
+        STRUCT('Temuco', 'Temuco'),
+        STRUCT('Valdivia', 'Valdivia'),
+        STRUCT('Vallenar', 'Vallenar'),
+        STRUCT('Villarrica', 'Villarrica'),
+        STRUCT('Concón', 'Vina del mar'),
+        STRUCT('Quilpué', 'Vina del mar'),
+        STRUCT('Valparaíso', 'Vina del mar'),
+        STRUCT('Villa Alemana', 'Vina del mar'),
+        STRUCT('Viña del Mar', 'Vina del mar'),
+        STRUCT('Concepción', 'Concepcion'),
+        STRUCT('Talcahuano', 'Concepcion'),
+        STRUCT('Coronel', 'Concepcion'),
+        STRUCT('Chiguayante', 'Concepcion'),
+        STRUCT('Hualpén', 'Concepcion'),
+        STRUCT('Penco', 'Concepcion'),
+        STRUCT('San Pedro de la Paz', 'Concepcion'),
+        STRUCT('Tomé', 'Concepcion'),
+        STRUCT('Padre Las Casas', 'Temuco'),
+        STRUCT('Vilcún', 'Temuco'),
+        STRUCT('Nueva Imperial', 'Temuco'),
+        STRUCT('Carahue', 'Temuco'),
+        STRUCT('Panguipulli', 'Valdivia')
+      ])
+      GROUP BY ciudad_perseus
+    ),
+
     base_sessions AS (
       SELECT
         s.area.area_name AS ciudad,
@@ -210,7 +291,7 @@ function buildMasterQuery_(filters) {
         dp.partner_name,
         dp.franchise.franchise_name AS franchise_name,
         CASE WHEN dp.is_logistic = TRUE THEN 'Logistic' ELSE 'Marketplace' END AS is_logistic_marketplace,
-        log.city_name_log,
+        COALESCE(log.city_name_log, clm.city_name_log) AS city_name_log,
         log.zone_name_log,
         COALESCE(log.total_rejected_orders, 0) AS rejected_orders,
         IF(m.mall_name IS NOT NULL, TRUE, FALSE) AS is_mall,
@@ -223,6 +304,8 @@ function buildMasterQuery_(filters) {
       FROM \`${BQ_CONFIG.TABLES.PARTNER}\` dp
       LEFT JOIN \`${BQ_CONFIG.TABLES.AREA}\` da ON dp.address.area_id = da.area_id
       LEFT JOIN \`${BQ_CONFIG.TABLES.HISTORICAL_PARTNERS}\` hp ON dp.partner_id = hp.restaurant_id
+      LEFT JOIN city_log_map clm
+        ON LOWER(TRIM(dp.city.name)) = LOWER(TRIM(clm.ciudad_perseus))
       LEFT JOIN \`${BQ_CONFIG.TABLES.ORDERS}\` fo
         ON dp.partner_id = fo.restaurant.id
        AND DATE(fo.registered_date) >= @from_date
@@ -234,12 +317,11 @@ function buildMasterQuery_(filters) {
        AND dp.address.latitude IS NOT NULL 
        AND ST_CONTAINS(m.mall_polygon, ST_GEOGPOINT(dp.address.longitude, dp.address.latitude))
       WHERE (dp.country.country_code = 'CL' OR dp.country_id = @country_id)
-        AND hp.is_active = TRUE
         AND DATE(hp.full_date) >= @from_date
         AND DATE(hp.full_date) <= @to_date
       GROUP BY
         dp.city.name, da.area_name, DATE(hp.full_date), dp.partner_id, dp.partner_name,
-        dp.franchise.franchise_name, dp.is_logistic, log.city_name_log, log.zone_name_log,
+        dp.franchise.franchise_name, dp.is_logistic, COALESCE(log.city_name_log, clm.city_name_log), log.zone_name_log,
         log.total_rejected_orders, m.mall_name
     ),
 
@@ -269,7 +351,7 @@ function buildMasterQuery_(filters) {
         COALESCE(s.sessions_checkout, 0) AS city_sessions_checkout,
         COALESCE(s.sessions_with_orders, 0) AS city_sessions_with_orders
       FROM base_partners p
-      LEFT JOIN base_sessions s ON p.zone_name = s.ciudad AND p.fecha = s.fecha
+      LEFT JOIN base_sessions s ON p.ciudad = s.ciudad AND p.fecha = s.fecha
     )
 
     SELECT *
