@@ -16,6 +16,15 @@ const UI_Charts = {
               <input type="checkbox" v-model="config.merged" @change="renderCharts" class="rounded text-peya-red-50 focus:ring-peya-red-50" />
               <span class="text-sm font-medium text-peya-navy-90">Fusionar Grupos</span>
             </label>
+            <select v-model="config.breakdown" @change="renderCharts" class="text-xs border-slate-300 rounded shadow-sm focus:ring-peya-red-50 focus:border-peya-red-50">
+              <option :value="null">Sin desglose</option>
+              <option value="is_mall">Mall / No Mall</option>
+              <option value="is_logistic_marketplace">Logistic / Marketplace</option>
+            </select>
+            <label v-if="config.breakdown" class="flex items-center gap-2 cursor-pointer bg-slate-100 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition">
+              <input type="checkbox" v-model="config.breakdownAsShare" @change="renderCharts" class="rounded text-peya-red-50 focus:ring-peya-red-50" />
+              <span class="text-sm font-medium text-peya-navy-90">Share (%)</span>
+            </label>
             <button @click="addMetric" class="text-xs bg-transparent border border-peya-navy-60 text-peya-navy-90 hover:bg-slate-100 px-3 py-1.5 rounded-full font-medium transition flex items-center gap-1">
               <svg class="w-3 h-3 fill-current" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M7.37019 2.73075C7.37019 2.32717 7.69736 2 8.10095 2C8.50453 2 8.8317 2.32717 8.8317 2.73075L8.8317 7.1683L13.2692 7.1683C13.6728 7.1683 14 7.49547 14 7.89906C14 8.30264 13.6728 8.62981 13.2692 8.62981H8.8317L8.8317 13.2692C8.8317 13.6728 8.50453 14 8.10094 14C7.69736 14 7.37019 13.6728 7.37019 13.2692L7.37019 8.62981H2.73075C2.32717 8.62981 2 8.30264 2 7.89906C2 7.49547 2.32717 7.1683 2.73075 7.1683H7.37019L7.37019 2.73075Z"/></svg>
               Añadir Métrica
@@ -74,7 +83,9 @@ const UI_Charts = {
     const config = reactive({
       metrics: [{ id: 'total_orders', type: 'bar', axis: 'left' }],
       merged: false,
-      showLabels: false
+      showLabels: false,
+      breakdown: null,
+      breakdownAsShare: false
     });
 
     const addMetric = () => {
@@ -93,11 +104,46 @@ const UI_Charts = {
 
     const hasData = computed(() => groupsWithData.value.length > 0);
 
+    const percentageMetrics = ['fail_rate', 'open_time_pct', 'city_cvr_neto', 'city_cvr_2', 'city_cvr_3'];
+
     const formatValue = (val, metric) => {
-      if (['fail_rate', 'open_time_pct', 'city_cvr_neto', 'city_cvr_2', 'city_cvr_3'].includes(metric)) {
-        return (val * 100).toFixed(2) + '%';
+      if (val === null || val === undefined || Number.isNaN(Number(val))) return '-';
+      if (metric === 'breakdown_share' || percentageMetrics.includes(metric)) {
+        return (val * 100).toFixed(1) + '%';
       }
-      return val.toLocaleString('es-CL');
+      return Number(val).toLocaleString('es-CL', { maximumFractionDigits: 1 });
+    };
+
+    const formatTooltip = metricIds => params => params.map(param =>
+      `${param.marker} ${param.seriesName}: ${formatValue(param.value, metricIds[param.seriesIndex])}`
+    ).join('<br/>');
+
+    const breakdownLabels = {
+      is_mall: { true: 'Mall', false: 'No Mall' },
+      is_logistic_marketplace: { Logistic: 'Logistic', Marketplace: 'Marketplace' }
+    };
+
+    const buildGroupSeries = (group, metric) => {
+      if (!config.breakdown) {
+        return [{
+          name: null,
+          metricId: metric.id,
+          dataByDate: new Map(group.aggregatedData.timeSeries.map(row => [row.fecha, row[metric.id]]))
+        }];
+      }
+
+      const breakdownData = Store.aggregateGroupByBreakdown(group.rawData, config.breakdown);
+      const groupTotals = new Map(group.aggregatedData.timeSeries.map(row => [row.fecha, row[metric.id]]));
+      return Object.entries(breakdownData).map(([dimensionValue, timeSeries]) => ({
+        name: breakdownLabels[config.breakdown][dimensionValue] || dimensionValue,
+        metricId: config.breakdownAsShare ? 'breakdown_share' : metric.id,
+        dataByDate: new Map(timeSeries.map(row => {
+          const value = row[metric.id];
+          if (!config.breakdownAsShare) return [row.fecha, value];
+          const total = groupTotals.get(row.fecha);
+          return [row.fecha, total > 0 ? value / total : null];
+        }))
+      }));
     };
 
     // Mapeo corto para ahorrar espacio en las leyendas de ECharts
@@ -133,10 +179,18 @@ const UI_Charts = {
         '#B40443', '#100423'
       ];
 
+      const axisFormatter = axis => value => {
+        const axisMetrics = config.metrics
+          .filter(metric => metric.axis === axis)
+          .map(metric => metric.id);
+        const allPercentages = config.breakdownAsShare || (axisMetrics.length > 0 && axisMetrics.every(metric => percentageMetrics.includes(metric)));
+        return allPercentages ? `${(Number(value) * 100).toFixed(1)}%` : Number(value).toLocaleString('es-CL', { maximumFractionDigits: 1 });
+      };
+
       // Configuración nativa ECharts para Eje Y Dual
       const dualYAxis = [
-        { type: 'value', position: 'left' },
-        { type: 'value', position: 'right', splitLine: { show: false } } // Ocultar líneas del eje secundario para evitar ruido
+        { type: 'value', position: 'left', axisLabel: { formatter: axisFormatter('left') } },
+        { type: 'value', position: 'right', splitLine: { show: false }, axisLabel: { formatter: axisFormatter('right') } } // Ocultar líneas del eje secundario para evitar ruido
       ];
 
       if (config.merged) {
@@ -156,34 +210,41 @@ const UI_Charts = {
         // En merged mode, las series son: (Grupos * Métricas)
         let series = [];
         let colorIdx = 0;
+        const mergedMetricIds = [];
 
         groupsWithData.value.forEach(g => {
           const dataMap = new Map(g.aggregatedData.timeSeries.map(d => [d.fecha, d]));
           
           config.metrics.forEach(cfg => {
-            series.push({
-              name: `${g.label} - ${legendLabels[cfg.id]}`,
-              type: cfg.type === 'area' ? 'line' : cfg.type,
-              smooth: true,
-              yAxisIndex: cfg.axis === 'right' ? 1 : 0,
-              data: xAxisData.map(fecha => {
-                const row = dataMap.get(fecha);
-                return row ? row[cfg.id] : 0;
-              }),
-              areaStyle: cfg.type === 'area' ? { opacity: 0.1 } : null,
-              label: {
-                show: config.showLabels,
-                position: 'top',
-                formatter: (p) => formatValue(p.value, cfg.id)
-              },
-              itemStyle: { color: peyaColors[colorIdx % peyaColors.length] }
+            buildGroupSeries(g, cfg).forEach(groupSeries => {
+              const seriesData = config.breakdown
+                ? xAxisData.map(fecha => groupSeries.dataByDate.get(fecha) ?? null)
+                : xAxisData.map(fecha => {
+                  const row = dataMap.get(fecha);
+                  return row ? row[cfg.id] : 0;
+                });
+              series.push({
+                name: `${g.label}${groupSeries.name ? ' - ' + groupSeries.name : ''} - ${legendLabels[cfg.id]}`,
+                type: cfg.type === 'area' ? 'line' : cfg.type,
+                smooth: true,
+                yAxisIndex: cfg.axis === 'right' ? 1 : 0,
+                data: seriesData,
+                areaStyle: cfg.type === 'area' ? { opacity: 0.1 } : null,
+                label: {
+                  show: config.showLabels,
+                  position: 'top',
+                  formatter: (p) => formatValue(p.value, groupSeries.metricId)
+                },
+                itemStyle: { color: peyaColors[colorIdx % peyaColors.length] }
+              });
+              mergedMetricIds.push(groupSeries.metricId);
+              colorIdx++;
             });
-            colorIdx++;
           });
         });
 
         chart.setOption({
-          tooltip: { trigger: 'axis' },
+          tooltip: { trigger: 'axis', formatter: formatTooltip(mergedMetricIds) },
           legend: { top: 'bottom', type: 'scroll' },
           grid: { left: '3%', right: '4%', bottom: '15%', containLabel: true },
           xAxis: { type: 'category', data: xAxisData },
@@ -202,26 +263,32 @@ const UI_Charts = {
 
           const xAxisData = g.aggregatedData.timeSeries.map(d => d.fecha);
           
-          const series = config.metrics.map((cfg, mIdx) => {
-            const seriesData = g.aggregatedData.timeSeries.map(d => d[cfg.id]);
-            return {
-              name: legendLabels[cfg.id],
+          const metricIds = [];
+          let seriesIndex = 0;
+          const series = config.metrics.flatMap(cfg => buildGroupSeries(g, cfg).map(groupSeries => {
+            metricIds.push(groupSeries.metricId);
+            const result = {
+              name: `${groupSeries.name ? groupSeries.name + ' - ' : ''}${legendLabels[cfg.id]}`,
               type: cfg.type === 'area' ? 'line' : cfg.type,
               smooth: true,
               yAxisIndex: cfg.axis === 'right' ? 1 : 0,
-              data: seriesData,
+              data: config.breakdown
+                ? xAxisData.map(fecha => groupSeries.dataByDate.get(fecha) ?? null)
+                : g.aggregatedData.timeSeries.map(row => groupSeries.dataByDate.get(row.fecha) ?? null),
               areaStyle: cfg.type === 'area' ? { opacity: 0.1 } : null,
               label: {
                 show: config.showLabels,
                 position: 'top',
-                formatter: (p) => formatValue(p.value, cfg.id)
+                formatter: (p) => formatValue(p.value, groupSeries.metricId)
               },
-              itemStyle: { color: peyaColors[mIdx % peyaColors.length] }
+              itemStyle: { color: peyaColors[seriesIndex % peyaColors.length] }
             };
-          });
+            seriesIndex++;
+            return result;
+          }));
 
           chart.setOption({
-            tooltip: { trigger: 'axis' },
+            tooltip: { trigger: 'axis', formatter: formatTooltip(metricIds) },
             legend: { top: 'top', type: 'scroll' },
             grid: { left: '5%', right: '5%', bottom: '10%', top: '15%', containLabel: true },
             xAxis: { type: 'category', data: xAxisData },

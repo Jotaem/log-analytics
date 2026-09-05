@@ -48,7 +48,8 @@ const Store = (function () {
   function dedupeCitySessions(rows) {
     const map = new Map();
     rows.forEach(function (row) {
-      const key = row.ciudad + '|' + row.fecha;
+      const cityKey = String(row.ciudad || '').trim().toLocaleLowerCase('es-CL');
+      const key = cityKey + '|' + row.fecha;
       if (!map.has(key)) {
         map.set(key, {
           ciudad: row.ciudad,
@@ -58,6 +59,17 @@ const Store = (function () {
           sessions_shop_details: row.city_sessions_shop_details || 0,
           sessions_checkout: row.city_sessions_checkout || 0,
           sessions_with_orders: row.city_sessions_with_orders || 0
+        });
+      } else if (
+        map.get(key).total_sessions !== (row.city_total_sessions_raw || 0) ||
+        map.get(key).sessions_shop_list !== (row.city_sessions_shop_list || 0) ||
+        map.get(key).sessions_shop_details !== (row.city_sessions_shop_details || 0) ||
+        map.get(key).sessions_checkout !== (row.city_sessions_checkout || 0) ||
+        map.get(key).sessions_with_orders !== (row.city_sessions_with_orders || 0)
+      ) {
+        console.warn('Sesiones inconsistentes para ciudad+fecha:', key, {
+          retained: map.get(key),
+          ignored: row
         });
       }
       // Si la misma ciudad+fecha ya está registrada, se ignora (es la
@@ -179,6 +191,37 @@ const Store = (function () {
     return { timeSeries: timeSeries, partnerTotals: partnerTotals, dedupedTotalSessions: dedupedTotalSessions };
   }
 
+  /**
+   * Agrega un grupo separado por una dimensión categórica.
+   * Reutiliza aggregateGroup() para conservar la deduplicación de sesiones
+   * y el cálculo ponderado de ratios dentro de cada partición.
+   *
+   * @param {Array<Object>} rawData
+   * @param {string} dimensionKey - `is_mall` o `is_logistic_marketplace`.
+   * @return {Object<string, Array<Object>>} Series agrupadas por dimensión.
+   */
+  function aggregateGroupByBreakdown(rawData, dimensionKey) {
+    if (!rawData || rawData.length === 0) return {};
+
+    const supportedDimensions = ['is_mall', 'is_logistic_marketplace'];
+    if (!supportedDimensions.includes(dimensionKey)) {
+      throw new Error('Dimensión de breakdown no soportada: ' + dimensionKey);
+    }
+
+    const rowsByDimension = new Map();
+    rawData.forEach(function (row) {
+      const dimensionValue = String(row[dimensionKey]);
+      if (!rowsByDimension.has(dimensionValue)) rowsByDimension.set(dimensionValue, []);
+      rowsByDimension.get(dimensionValue).push(row);
+    });
+
+    const result = {};
+    rowsByDimension.forEach(function (rows, dimensionValue) {
+      result[dimensionValue] = aggregateGroup(rows).timeSeries;
+    });
+    return result;
+  }
+
   // ---------------------------------------------------------------------
   // GESTIÓN DE GRUPOS (2 a 4)
   // ---------------------------------------------------------------------
@@ -289,6 +332,7 @@ const Store = (function () {
     calcShareOverGroup: calcShareOverGroup,
     calcPenetracion: calcPenetracion,
     aggregateGroup: aggregateGroup,
+    aggregateGroupByBreakdown: aggregateGroupByBreakdown,
     // gestión de grupos
     addGroup: addGroup,
     removeGroup: removeGroup,

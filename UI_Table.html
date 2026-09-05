@@ -36,8 +36,8 @@ const UI_Table = {
     const escapeHtml = (value) => String(value ?? '-').replace(/[&<>"']/g, character => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
     }[character]));
-    const formatNum = (value) => value === null || value === undefined ? '-' : Number(value).toLocaleString('es-CL');
-    const formatPct = (value) => value === null || value === undefined ? '-' : (value * 100).toFixed(2) + '%';
+    const formatNum = (value) => value === null || value === undefined ? '-' : Number(value).toLocaleString('es-CL', { maximumFractionDigits: 1 });
+    const formatPct = (value) => value === null || value === undefined ? '-' : (value * 100).toFixed(1) + '%';
 
     const getGroupsWithData = () => storeState.groups.filter(group =>
       group.aggregatedData && group.aggregatedData.partnerTotals && group.aggregatedData.partnerTotals.length > 0
