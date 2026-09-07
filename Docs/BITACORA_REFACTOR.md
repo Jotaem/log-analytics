@@ -154,6 +154,36 @@ Copia esta plantilla al inicio del archivo (justo debajo de este bloque de instr
 ### Criterio de éxito de la subfase
 - [ ] Pendiente de validación visual y matemática real — Implementación, sintaxis y diagnósticos locales completados.
 
+## [Fecha: 2026-09-05] — Fix #5: Partners Abiertos y Partners con Venta
+
+- **Hora de inicio – Hora de cierre:** [no registrada] – [no registrada]
+- **Duración total:** [no registrada]
+- **Fase / Subfase relacionada:** REFACTOR_PLAN.md — Fix #5 (Métricas faltantes)
+- **Objetivo de la sesión:** Agregar métricas diarias de partners distintos abiertos y con al menos una venta confirmada.
+
+### Archivos creados/modificados
+- `Store.html` — Se agregaron `partners_open` y `partners_with_sales` a cada fila de `timeSeries`, usando `Set` por `vendor_code`.
+- `UI_Charts.html` — Se agregaron ambas métricas al selector y a las leyendas de ECharts.
+
+### Decisiones tomadas
+- `partners_open` cuenta partners con `is_active_partner` verdadero ese día.
+- `partners_with_sales` cuenta partners distintos con `confirmed_orders > 0`.
+- Ambas métricas son conteos absolutos, no porcentajes, y se calculan completamente en memoria.
+
+### Pendientes para la próxima sesión
+- Validar visualmente con un día real que `partners_with_sales <= partners_open`.
+- Continuar con Fix #6: completar los modos temporales Semanas, Meses y Día de la Semana en `UI_Filters.html`.
+
+### Criterio de éxito de la subfase
+- [x] Cumplido localmente — Smoke test, sintaxis, diagnósticos y formato correctos; falta confirmación con datos reales.
+
+### Hotfix y validación en deployment
+- Se investigó una aparente regresión posterior a Fix #5. La evidencia de consola mostró `rawRows: [0, 0]`, `timeSeries: [0, 0]` y `partnerTotals: [0, 0]`, con `error: [null, null]`; por tanto, el problema ocurría antes de Vue y de la agregación, porque el backend estaba devolviendo un dataset vacío.
+- Se instrumentó temporalmente el payload del frontend y el job de BigQuery para distinguir filtros, job y paginación. La instrumentación confirmó que el flujo estaba enviando los rangos y filtros esperados.
+- Tras aplicar una versión coherente de GAS, la consola confirmó el retorno de 9.250 y 10.964 filas y el renderizado correcto de gráficos y tablas.
+- Se retiraron los cuatro `console.log` temporales antes de cerrar esta entrada; no forman parte del comportamiento de producción.
+- Los mensajes de sandbox, `postMessage`, Tailwind CDN y listeners no pasivos de ECharts quedaron clasificados como advertencias externas/no bloqueantes.
+
 ## [Fecha: 2026-09-02] — Refactor UI, Design System y Herramientas Analíticas IA
 
 - **Hora de inicio – Hora de cierre:** 16:30 – 20:15

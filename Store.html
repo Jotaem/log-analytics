@@ -133,6 +133,12 @@ const Store = (function () {
 
     const timeSeries = Array.from(byDate.keys()).sort().map(function (fecha) {
       const rowsOfDate = byDate.get(fecha);
+      const partnersOpenSet = new Set();
+      const partnersWithSalesSet = new Set();
+      rowsOfDate.forEach(function (row) {
+        if (row.is_active_partner) partnersOpenSet.add(row.vendor_code);
+        if (row.confirmed_orders > 0) partnersWithSalesSet.add(row.vendor_code);
+      });
 
       // Sesiones del día: sumar solo las entradas deduplicadas cuya fecha sea esta.
       const sessionsOfDate = Array.from(cityDedup.values())
@@ -153,7 +159,9 @@ const Store = (function () {
         city_total_sessions: totalSessionsDate,
         city_cvr_neto: totalSessionsDate > 0 ? sessionsWithOrdersDate / totalSessionsDate : null,
         city_cvr_2: sessionsShopListDate > 0 ? sessionsShopDetailsDate / sessionsShopListDate : null,
-        city_cvr_3: sessionsCheckoutDate > 0 ? sessionsWithOrdersDate / sessionsCheckoutDate : null
+        city_cvr_3: sessionsCheckoutDate > 0 ? sessionsWithOrdersDate / sessionsCheckoutDate : null,
+        partners_open: partnersOpenSet.size,
+        partners_with_sales: partnersWithSalesSet.size
       };
     });
 

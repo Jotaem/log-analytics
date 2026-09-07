@@ -48,6 +48,8 @@ const UI_Charts = {
               <option value="city_cvr_2">City CVR 2</option>
               <option value="city_cvr_3">City CVR 3</option>
               <option value="open_time_pct">Cumplimiento Open Time %</option>
+              <option value="partners_open">N° Partners Abiertos</option>
+              <option value="partners_with_sales">N° Partners con Venta</option>
             </select>
             <select v-model="cfg.type" @change="renderCharts" class="text-xs border-slate-300 rounded shadow-sm focus:ring-peya-red-50 focus:border-peya-red-50">
               <option value="line">Línea</option>
@@ -156,7 +158,9 @@ const UI_Charts = {
       city_cvr_neto: '% CVR Neto',
       city_cvr_2: '% CVR2',
       city_cvr_3: '% CVR3',
-      open_time_pct: '% OT'
+      open_time_pct: '% OT',
+      partners_open: 'Partners Abiertos',
+      partners_with_sales: 'Partners con Venta'
     };
 
     const disposeCharts = () => {
