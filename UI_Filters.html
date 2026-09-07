@@ -80,7 +80,7 @@ const UI_Filters = {
           <svg class="w-5 h-5 fill-current text-peya-navy-70" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M5.51914 2C4.54897 2 3.73764 2.68233 3.53402 3.59551H2.04588C1.74444 3.59551 1.50008 3.84107 1.50008 4.14399C1.50008 4.44691 1.74444 4.69247 2.04588 4.69247H3.58921C3.85891 5.50374 4.62088 6.08866 5.51914 6.08866C6.4174 6.08866 7.17937 5.50374 7.44907 4.69247H13.9542C14.2556 4.69247 14.5 4.44691 14.5 4.14399C14.5 3.84107 14.2556 3.59551 13.9542 3.59551H7.50426C7.30064 2.68233 6.48931 2 5.51914 2ZM4.5764 4.04433C4.5764 3.52111 4.99848 3.09696 5.51914 3.09696C6.0398 3.09696 6.46188 3.52111 6.46188 4.04433C6.46188 4.56755 6.0398 4.99171 5.51914 4.99171C4.99848 4.99171 4.5764 4.56755 4.5764 4.04433Z"/><path fill-rule="evenodd" clip-rule="evenodd" d="M10.4809 6.12184C9.55835 6.12184 8.77952 6.73883 8.53015 7.58445H2.0458C1.74436 7.58445 1.5 7.83002 1.5 8.13293C1.5 8.43585 1.74436 8.68141 2.0458 8.68141L8.51177 8.68141C8.73909 9.56103 9.53437 10.2105 10.4809 10.2105C11.4274 10.2105 12.2227 9.56103 12.45 8.68141H13.9541C14.2556 8.68141 14.4999 8.43585 14.4999 8.13293C14.4999 7.83002 14.2556 7.58445 13.9541 7.58445H12.4317C12.1823 6.73883 11.4035 6.12184 10.4809 6.12184ZM9.53817 8.16617C9.53817 7.64295 9.96025 7.2188 10.4809 7.2188C11.0016 7.2188 11.4237 7.64295 11.4237 8.16617C11.4237 8.68939 11.0016 9.11355 10.4809 9.11355C9.96025 9.11355 9.53817 8.68939 9.53817 8.16617Z"/><path fill-rule="evenodd" clip-rule="evenodd" d="M5.51914 9.91133C4.52557 9.91133 3.69854 10.627 3.52033 11.5734H2.04588C1.74444 11.5734 1.50008 11.819 1.50008 12.1219C1.50008 12.4248 1.74444 12.6704 2.04588 12.6704H3.61262C3.90098 13.4468 4.6456 14 5.51914 14C6.39268 14 7.1373 13.4468 7.42566 12.6704H13.9542C14.2556 12.6704 14.5 12.4248 14.5 12.1219C14.5 11.819 14.2556 11.5734 13.9542 11.5734H7.51795C7.33974 10.627 6.51271 9.91133 5.51914 9.91133ZM4.5764 11.9557C4.5764 11.4324 4.99848 11.0083 5.51914 11.0083C6.0398 11.0083 6.46188 11.4324 6.46188 11.9557C6.46188 12.4789 6.0398 12.903 5.51914 12.903C4.99848 12.903 4.5764 12.4789 4.5764 11.9557Z"/></svg>
           Panel de Cohortes
         </h2>
-        <div class="flex flex-wrap items-center justify-end gap-3 w-full md:w-auto">
+        <div class="flex items-center gap-3">
           <div v-if="hasData" class="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
             <select v-model="promptType" class="text-xs border-none bg-transparent py-0 focus:ring-0 text-peya-navy-70 font-medium cursor-pointer">
               <option value="expansion">Evaluar Expansión (Feriados)</option>
@@ -96,17 +96,17 @@ const UI_Filters = {
       </div>
 
       <!-- FILTROS GLOBALES -->
-      <div class="grid w-full grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4 mb-8 clear-both">
-        <div class="min-w-0"><city-dropdown v-model="globalFilters.cities" label="CIUDADES"></city-dropdown></div>
-        <div class="min-w-0">
+      <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
+        <city-dropdown v-model="globalFilters.cities" label="CIUDADES"></city-dropdown>
+        <div>
           <label class="block text-xs font-semibold text-peya-navy-70 uppercase mb-1">Zonas (Log)</label>
           <input v-model="globalFilters.zones" type="text" placeholder="Ej: Las Condes, Centro..." class="w-full text-sm border-slate-300 rounded-md shadow-sm focus:ring-peya-red-50 focus:border-peya-red-50" />
         </div>
-        <div class="min-w-0">
+        <div>
           <label class="block text-xs font-semibold text-peya-navy-70 uppercase mb-1">Franquicia</label>
           <input v-model="globalFilters.franchises" type="text" placeholder="Ej: McDonald's..." class="w-full text-sm border-slate-300 rounded-md shadow-sm focus:ring-peya-red-50 focus:border-peya-red-50" />
         </div>
-        <div class="min-w-0">
+        <div>
           <label class="block text-xs font-semibold text-peya-navy-70 uppercase mb-1">Operación</label>
           <select v-model="globalFilters.logisticMarketplace" class="w-full text-sm border-slate-300 rounded-md shadow-sm focus:ring-peya-red-50 focus:border-peya-red-50">
             <option :value="null">Ambos (Sin filtro)</option>
@@ -114,7 +114,7 @@ const UI_Filters = {
             <option value="Marketplace">Marketplace</option>
           </select>
         </div>
-        <div class="min-w-0">
+        <div>
           <label class="block text-xs font-semibold text-peya-navy-70 uppercase mb-1">Ubicación</label>
           <select v-model="globalFilters.isMall" class="w-full text-sm border-slate-300 rounded-md shadow-sm focus:ring-peya-red-50 focus:border-peya-red-50">
             <option :value="null">Todos (Sin filtro)</option>
@@ -124,7 +124,7 @@ const UI_Filters = {
         </div>
       </div>
 
-      <div class="flex w-full justify-end border-b border-slate-100 pb-6 mb-6 clear-both">
+      <div class="flex justify-end border-b border-slate-100 pb-6 mb-6">
         <button
           @click="aplicarFiltros"
           :disabled="isApplying"
@@ -135,7 +135,7 @@ const UI_Filters = {
       </div>
 
       <!-- GESTIÓN DE GRUPOS -->
-      <div class="flex w-full items-center gap-3 mb-4 clear-both">
+      <div class="flex items-center gap-3 mb-4">
         <h3 class="text-sm font-bold text-peya-navy-90 uppercase">Grupos de Comparación ({{ storeState.groups.length }}/4)</h3>
         <button v-if="storeState.groups.length < 4" @click="agregarGrupo" class="text-xs bg-transparent border border-peya-navy-60 text-peya-navy-90 hover:bg-slate-100 px-3 py-1 rounded-full font-medium transition flex items-center gap-1">
           <svg class="w-3 h-3 fill-current" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M7.37019 2.73075C7.37019 2.32717 7.69736 2 8.10095 2C8.50453 2 8.8317 2.32717 8.8317 2.73075L8.8317 7.1683L13.2692 7.1683C13.6728 7.1683 14 7.49547 14 7.89906C14 8.30264 13.6728 8.62981 13.2692 8.62981H8.8317L8.8317 13.2692C8.8317 13.6728 8.50453 14 8.10094 14C7.69736 14 7.37019 13.6728 7.37019 13.2692L7.37019 8.62981H2.73075C2.32717 8.62981 2 8.30264 2 7.89906C2 7.49547 2.32717 7.1683 2.73075 7.1683H7.37019L7.37019 2.73075Z"/></svg>
@@ -143,7 +143,7 @@ const UI_Filters = {
         </button>
       </div>
 
-      <div class="grid w-full grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4 clear-both">
+      <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4">
         <div v-for="(group, index) in storeState.groups" :key="group.id" class="border border-slate-200 rounded-xl p-4 relative bg-slate-50">
           <button v-if="storeState.groups.length > 1" @click="removerGrupo(group.id)" class="absolute top-3 right-3 text-peya-navy-60 hover:text-peya-red-50 transition">
             <svg class="w-4 h-4 fill-current" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M2.74465 2.73766C3.06852 2.42078 3.59193 2.42078 3.91579 2.73766L8.11718 6.84831L12.0842 2.96695C12.4081 2.65007 12.9315 2.65007 13.2554 2.96695C13.5815 3.2861 13.5815 3.80532 13.2553 4.12448L9.29429 8L13.2553 11.8755C13.5815 12.1947 13.5815 12.7139 13.2553 13.0331C12.9315 13.3499 12.4081 13.3499 12.0842 13.0331L8.11717 9.15169L3.9158 13.2623C3.59193 13.5792 3.06852 13.5792 2.74465 13.2623C2.41845 12.9432 2.41845 12.424 2.74465 12.1048L6.94006 8L2.74465 3.89518C2.41845 3.57603 2.41845 3.05681 2.74465 2.73766Z"/></svg>
