@@ -184,6 +184,38 @@ Copia esta plantilla al inicio del archivo (justo debajo de este bloque de instr
 - Se retiraron los cuatro `console.log` temporales antes de cerrar esta entrada; no forman parte del comportamiento de producción.
 - Los mensajes de sandbox, `postMessage`, Tailwind CDN y listeners no pasivos de ECharts quedaron clasificados como advertencias externas/no bloqueantes.
 
+## [Fecha: 2026-09-07] — Fix #7: Dropdown oficial de ciudades
+
+- **Hora de inicio – Hora de cierre:** [no registrada] – [no registrada]
+- **Duración total:** [no registrada]
+- **Fase / Subfase relacionada:** REFACTOR_PLAN.md — Fix #7 (Dropdown de ciudad)
+- **Objetivo de la sesión:** Eliminar typos en el filtro de ciudad usando únicamente el catálogo oficial de `city_name_log`.
+
+### Archivos creados/modificados
+- `UI_Filters.html` — Se añadió `CityDropdownComponent` con selección múltiple y la lista oficial de ciudades; `globalFilters.cities` ahora inicia como `string[]` y conserva el mismo contrato del payload hacia GAS.
+
+### Decisiones tomadas
+- La selección se limita a valores cerrados del catálogo oficial; no existe entrada de texto libre para ciudades.
+- `Total Regiones` se mantiene como opción visual del catálogo solicitado; el backend recibe el valor seleccionado sin transformación adicional.
+- Zonas y franquicias permanecen como texto libre porque no existe un catálogo cerrado confirmado para ellas.
+- El Bug 6 (modos temporales Semanas, Meses y Día de la Semana) queda explícitamente pospuesto por su mayor complejidad.
+
+### Pendientes para la próxima sesión
+- Validar visualmente seleccionar `Temuco` y confirmar que el payload contiene `cities: ['Temuco']`.
+- Confirmar con BigQuery que el filtro devuelve únicamente el `city_name_log` seleccionado.
+- Retomar Fix #6 cuando se decida abordar su diseño temporal completo.
+
+### Criterio de éxito de la subfase
+- [x] Cumplido localmente — Dropdown, contrato `string[]`, sintaxis, diagnósticos y formato validados; queda confirmación visual/BigQuery.
+
+### Hotfix UX posterior a validación visual
+- Se eliminó la etiqueta duplicada del filtro de ciudades: el componente renderiza un único label `CIUDADES`, alineado con `OPERACIÓN` y `UBICACIÓN`.
+- Se restauró la visibilidad del botón `Aplicar Filtros` mediante un control no comprimible (`shrink-0`, `whitespace-nowrap`) y prioridad visual.
+- El dropdown se cierra al hacer clic fuera mediante listener documentado y se limpia al desmontar el componente.
+- Se añadió selección global `Todas las ciudades` para marcar o desmarcar todo de forma explícita.
+- La caja mantiene altura estable y resume selecciones múltiples como `Varios (N)`; una ciudad muestra su nombre y cero o todas muestran `Todas`.
+- Se eliminó `Total Regiones` del catálogo para evitar una opción ambigua. Una selección vacía o completa equivale a no filtrar; una selección parcial envía solo las ciudades elegidas.
+
 ## [Fecha: 2026-09-02] — Refactor UI, Design System y Herramientas Analíticas IA
 
 - **Hora de inicio – Hora de cierre:** 16:30 – 20:15
