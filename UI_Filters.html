@@ -92,13 +92,6 @@ const UI_Filters = {
               {{ isCopying ? 'Copiando...' : 'Copiar Prompt' }}
             </button>
           </div>
-          <button 
-            @click="aplicarFiltros" 
-            :disabled="isApplying"
-            class="relative z-40 order-last md:order-none shrink-0 whitespace-nowrap px-6 py-2 bg-peya-red-50 text-peya-white font-semibold rounded-lg hover:bg-peya-red-40 transition disabled:opacity-50 flex items-center gap-2">
-            <span v-if="isApplying" class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
-            {{ isApplying ? 'Calculando...' : 'Aplicar Filtros' }}
-          </button>
         </div>
       </div>
 
@@ -129,6 +122,16 @@ const UI_Filters = {
             <option :value="false">No Malls (Calle)</option>
           </select>
         </div>
+      </div>
+
+      <div class="flex justify-end border-b border-slate-100 pb-6 mb-6">
+        <button
+          @click="aplicarFiltros"
+          :disabled="isApplying"
+          class="relative z-40 inline-flex shrink-0 items-center gap-2 whitespace-nowrap px-6 py-2 bg-peya-red-50 text-peya-white font-semibold rounded-lg hover:bg-peya-red-40 transition disabled:opacity-50">
+          <span v-if="isApplying" class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
+          {{ isApplying ? 'Calculando...' : 'Aplicar Filtros' }}
+        </button>
       </div>
 
       <!-- GESTIÓN DE GRUPOS -->
