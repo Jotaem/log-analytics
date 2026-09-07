@@ -216,6 +216,27 @@ Copia esta plantilla al inicio del archivo (justo debajo de este bloque de instr
 - La caja mantiene altura estable y resume selecciones múltiples como `Varios (N)`; una ciudad muestra su nombre y cero o todas muestran `Todas`.
 - Se eliminó `Total Regiones` del catálogo para evitar una opción ambigua. Una selección vacía o completa equivale a no filtrar; una selección parcial envía solo las ciudades elegidas.
 
+## [Fecha: 2026-09-07] — Hotfix anti fan-out y layout responsive de filtros
+
+- **Hora de inicio – Hora de cierre:** [no registrada] – [no registrada]
+- **Duración total:** [no registrada]
+- **Fase / Subfase relacionada:** Corrección crítica de métricas infladas y estabilización UX del filtro de ciudades.
+- **Objetivo de la sesión:** Evitar la multiplicación de minutos de apertura causada por joins a órdenes individuales y garantizar que `Aplicar Filtros` permanezca visible en viewport estrecho.
+
+### Archivos creados/modificados
+- `Service_BigQuery.gs` — Se añadieron `historical_partner_day` y `orders_by_partner_day`, ambos a grano `partner_id + fecha`; `base_partners` dejó de unir órdenes fila a fila y dejó de sumar `hp.schedule_open_time` después de ese join.
+- `UI_Filters.html` — El encabezado de acciones ahora puede envolver sus controles y el botón `Aplicar Filtros` conserva una posición visible y no comprimible.
+- `BITACORA_REFACTOR.md` — Se registra el diagnóstico de fan-out y las dudas de matching.
+
+### Decisiones tomadas
+- `partners_open` mantiene su definición actual: partner con `schedule_open_time > 0`, es decir, disponibilidad programada. No se redefine como conexión real sin una regla de negocio confirmada.
+- `real_open_time` continúa siendo la métrica de minutos efectivamente abiertos/conectados y se calcula desde `closed_times`; no se usa para contar partners abiertos automáticamente.
+- Las sesiones siguen siendo Perseus (`p.ciudad` y `base_sessions.ciudad`) y se deduplican por ciudad Perseus+fecha. Un filtro de ciudad logística puede mapear a varias ciudades Perseus mediante `city_log_map`; por eso el total logístico puede contener varias bolsas de sesiones.
+- El filtro por `city_name_log` no se reinterpretó como filtro por una única ciudad Perseus; cambiar esa semántica requiere una decisión de negocio.
+
+### Criterio de éxito
+- [x] Cumplido localmente — La query se construye con CTEs preagregadas a `partner_id + fecha`, desaparece el join de órdenes fila a fila, conserva fechas cerradas y el layout permite envolver el botón. Falta confirmar métricas reales en BigQuery para Villarrica/Ovalle.
+
 ## [Fecha: 2026-09-02] — Refactor UI, Design System y Herramientas Analíticas IA
 
 - **Hora de inicio – Hora de cierre:** 16:30 – 20:15

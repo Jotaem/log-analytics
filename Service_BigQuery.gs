@@ -282,6 +282,31 @@ function buildMasterQuery_(filters) {
       GROUP BY 1, 2
     ),
 
+    historical_partner_day AS (
+      SELECT
+        hp.restaurant_id AS partner_id,
+        DATE(hp.full_date) AS fecha,
+        SUM(COALESCE(hp.schedule_open_time, 0)) AS schedule_open_time,
+        SUM(GREATEST(0, COALESCE(hp.schedule_open_time, 0) - COALESCE(hp.closed_times, 0))) AS real_open_time,
+        MAX(CASE WHEN COALESCE(hp.schedule_open_time, 0) > 0 THEN 1 ELSE 0 END) AS is_active_partner
+      FROM \`${BQ_CONFIG.TABLES.HISTORICAL_PARTNERS}\` hp
+      WHERE DATE(hp.full_date) >= @from_date
+        AND DATE(hp.full_date) <= @to_date
+      GROUP BY 1, 2
+    ),
+
+    orders_by_partner_day AS (
+      SELECT
+        fo.restaurant.id AS partner_id,
+        DATE(fo.registered_date) AS fecha,
+        COUNT(DISTINCT fo.order_id) AS total_orders,
+        COUNT(DISTINCT CASE WHEN fo.order_status = 'CONFIRMED' THEN fo.order_id END) AS confirmed_orders
+      FROM \`${BQ_CONFIG.TABLES.ORDERS}\` fo
+      WHERE DATE(fo.registered_date) >= @from_date
+        AND DATE(fo.registered_date) <= @to_date
+      GROUP BY 1, 2
+    ),
+
     base_partners AS (
       SELECT
         dp.city.name AS ciudad,
@@ -296,33 +321,31 @@ function buildMasterQuery_(filters) {
         COALESCE(log.total_rejected_orders, 0) AS rejected_orders,
         IF(m.mall_name IS NOT NULL, TRUE, FALSE) AS is_mall,
         COALESCE(m.mall_name, 'Sin Mall') AS mall_name,
-        SUM(COALESCE(hp.schedule_open_time, 0)) AS schedule_open_time,
-        SUM(GREATEST(0, COALESCE(hp.schedule_open_time, 0) - COALESCE(hp.closed_times, 0))) AS real_open_time,
-        MAX(CASE WHEN COALESCE(hp.schedule_open_time, 0) > 0 THEN 1 ELSE 0 END) AS is_active_partner,
-        COUNT(DISTINCT fo.order_id) AS total_orders,
-        COUNT(DISTINCT CASE WHEN fo.order_status = 'CONFIRMED' THEN fo.order_id END) AS confirmed_orders
+        COALESCE(hp.schedule_open_time, 0) AS schedule_open_time,
+        COALESCE(hp.real_open_time, 0) AS real_open_time,
+        COALESCE(hp.is_active_partner, 0) AS is_active_partner,
+        COALESCE(fo.total_orders, 0) AS total_orders,
+        COALESCE(fo.confirmed_orders, 0) AS confirmed_orders
       FROM \`${BQ_CONFIG.TABLES.PARTNER}\` dp
       LEFT JOIN \`${BQ_CONFIG.TABLES.AREA}\` da ON dp.address.area_id = da.area_id
-      LEFT JOIN \`${BQ_CONFIG.TABLES.HISTORICAL_PARTNERS}\` hp ON dp.partner_id = hp.restaurant_id
+      LEFT JOIN historical_partner_day hp ON dp.partner_id = hp.partner_id
       LEFT JOIN city_log_map clm
         ON LOWER(TRIM(dp.city.name)) = LOWER(TRIM(clm.ciudad_perseus))
-      LEFT JOIN \`${BQ_CONFIG.TABLES.ORDERS}\` fo
-        ON dp.partner_id = fo.restaurant.id
-       AND DATE(fo.registered_date) >= @from_date
-       AND DATE(fo.registered_date) <= @to_date
-       AND DATE(fo.registered_date) = DATE(hp.full_date)
-      LEFT JOIN base_logistics log ON dp.partner_id = log.partner_id AND DATE(hp.full_date) = log.fecha
+      LEFT JOIN orders_by_partner_day fo
+        ON dp.partner_id = fo.partner_id
+       AND hp.fecha = fo.fecha
+      LEFT JOIN base_logistics log ON dp.partner_id = log.partner_id AND hp.fecha = log.fecha
       LEFT JOIN malls m 
         ON dp.address.longitude IS NOT NULL 
        AND dp.address.latitude IS NOT NULL 
        AND ST_CONTAINS(m.mall_polygon, ST_GEOGPOINT(dp.address.longitude, dp.address.latitude))
       WHERE (dp.country.country_code = 'CL' OR dp.country_id = @country_id)
-        AND DATE(hp.full_date) >= @from_date
-        AND DATE(hp.full_date) <= @to_date
+        AND hp.fecha IS NOT NULL
       GROUP BY
-        dp.city.name, da.area_name, DATE(hp.full_date), dp.partner_id, dp.partner_name,
+        dp.city.name, da.area_name, hp.fecha, dp.partner_id, dp.partner_name,
         dp.franchise.franchise_name, dp.is_logistic, COALESCE(log.city_name_log, clm.city_name_log), log.zone_name_log,
-        log.total_rejected_orders, m.mall_name
+        log.total_rejected_orders, m.mall_name, hp.schedule_open_time, hp.real_open_time,
+        hp.is_active_partner, fo.total_orders, fo.confirmed_orders
     ),
 
     dataset AS (
