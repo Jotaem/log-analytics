@@ -311,7 +311,7 @@ function buildMasterQuery_(filters) {
       SELECT
         dp.city.name AS ciudad,
         da.area_name AS zone_name,
-        DATE(hp.full_date) AS fecha,
+        hpd.fecha AS fecha,
         dp.partner_id,
         dp.partner_name,
         dp.franchise.franchise_name AS franchise_name,
@@ -321,9 +321,9 @@ function buildMasterQuery_(filters) {
         COALESCE(log.total_rejected_orders, 0) AS rejected_orders,
         IF(m.mall_name IS NOT NULL, TRUE, FALSE) AS is_mall,
         COALESCE(m.mall_name, 'Sin Mall') AS mall_name,
-        COALESCE(hp.schedule_open_time, 0) AS schedule_open_time,
-        COALESCE(hp.real_open_time, 0) AS real_open_time,
-        COALESCE(hp.is_active_partner, 0) AS is_active_partner,
+        COALESCE(hpd.schedule_open_time, 0) AS schedule_open_time,
+        COALESCE(hpd.real_open_time, 0) AS real_open_time,
+        COALESCE(hpd.is_active_partner, 0) AS is_active_partner,
         COALESCE(fo.total_orders, 0) AS total_orders,
         COALESCE(fo.confirmed_orders, 0) AS confirmed_orders
       FROM \`${BQ_CONFIG.TABLES.PARTNER}\` dp
