@@ -237,6 +237,10 @@ Copia esta plantilla al inicio del archivo (justo debajo de este bloque de instr
 ### Criterio de éxito
 - [x] Cumplido localmente — La query se construye con CTEs preagregadas a `partner_id + fecha`, desaparece el join de órdenes fila a fila, conserva fechas cerradas y el layout permite envolver el botón. Falta confirmar métricas reales en BigQuery para Villarrica/Ovalle.
 
+### Hotfix posterior: alias del CTE y errores largos
+- El deployment reportó `Name full_date not found inside hp`. Se desambiguó el alias del CTE preagregado a `hpd` y `base_partners` ahora usa exclusivamente `hpd.fecha`; `hp.full_date` queda solo dentro del CTE que lee la tabla histórica fuente.
+- Los mensajes de error de BigQuery ahora usan `break-words` y `whitespace-normal` para no desbordar las tarjetas ni deformar el panel.
+
 ## [Fecha: 2026-09-02] — Refactor UI, Design System y Herramientas Analíticas IA
 
 - **Hora de inicio – Hora de cierre:** 16:30 – 20:15

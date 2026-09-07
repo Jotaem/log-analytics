@@ -328,24 +328,24 @@ function buildMasterQuery_(filters) {
         COALESCE(fo.confirmed_orders, 0) AS confirmed_orders
       FROM \`${BQ_CONFIG.TABLES.PARTNER}\` dp
       LEFT JOIN \`${BQ_CONFIG.TABLES.AREA}\` da ON dp.address.area_id = da.area_id
-      LEFT JOIN historical_partner_day hp ON dp.partner_id = hp.partner_id
+      LEFT JOIN historical_partner_day hpd ON dp.partner_id = hpd.partner_id
       LEFT JOIN city_log_map clm
         ON LOWER(TRIM(dp.city.name)) = LOWER(TRIM(clm.ciudad_perseus))
       LEFT JOIN orders_by_partner_day fo
         ON dp.partner_id = fo.partner_id
-       AND hp.fecha = fo.fecha
-      LEFT JOIN base_logistics log ON dp.partner_id = log.partner_id AND hp.fecha = log.fecha
+      AND hpd.fecha = fo.fecha
+          LEFT JOIN base_logistics log ON dp.partner_id = log.partner_id AND hpd.fecha = log.fecha
       LEFT JOIN malls m 
         ON dp.address.longitude IS NOT NULL 
        AND dp.address.latitude IS NOT NULL 
        AND ST_CONTAINS(m.mall_polygon, ST_GEOGPOINT(dp.address.longitude, dp.address.latitude))
       WHERE (dp.country.country_code = 'CL' OR dp.country_id = @country_id)
-        AND hp.fecha IS NOT NULL
+        AND hpd.fecha IS NOT NULL
       GROUP BY
-        dp.city.name, da.area_name, hp.fecha, dp.partner_id, dp.partner_name,
+        dp.city.name, da.area_name, hpd.fecha, dp.partner_id, dp.partner_name,
         dp.franchise.franchise_name, dp.is_logistic, COALESCE(log.city_name_log, clm.city_name_log), log.zone_name_log,
-        log.total_rejected_orders, m.mall_name, hp.schedule_open_time, hp.real_open_time,
-        hp.is_active_partner, fo.total_orders, fo.confirmed_orders
+        log.total_rejected_orders, m.mall_name, hpd.schedule_open_time, hpd.real_open_time,
+        hpd.is_active_partner, fo.total_orders, fo.confirmed_orders
     ),
 
     dataset AS (
